@@ -1,0 +1,104 @@
+@import "tailwindcss";
+
+@theme {
+  --color-primary: #5B4FE0;
+  --color-primary-50: #F4F3FF;
+  --color-primary-100: #E9E6FE;
+  --color-primary-200: #D5D0FD;
+  --color-primary-300: #B4AAFA;
+  --color-primary-400: #8C7DF6;
+  --color-primary-500: #5B4FE0;
+  --color-primary-600: #4F3CD6;
+  --color-primary-700: #432FB8;
+  --color-primary-800: #382895;
+  --color-primary-900: #2F2378;
+
+  --color-sidebar: #0F1629;
+  --color-sidebar-hover: #19223C;
+  --color-sidebar-active: #5B4FE0;
+  --color-sidebar-border: #1E293B;
+
+  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+  --shadow-card: 0 2px 10px 0 rgba(15, 22, 41, 0.04), 0 1px 3px 0 rgba(15, 22, 41, 0.02);
+  --shadow-card-hover: 0 10px 25px -5px rgba(15, 22, 41, 0.08), 0 8px 10px -6px rgba(15, 22, 41, 0.04);
+}
+
+.btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.5rem 1rem;
+  background-color: #5B4FE0;
+  color: white;
+  font-weight: 600;
+  border-radius: 0.5rem;
+  transition: all 0.15s ease-in-out;
+  cursor: pointer;
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+}
+.btn-primary:hover {
+  background-color: #4F3CD6;
+}
+
+.btn-outline {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.5rem 1rem;
+  border: 1px solid #E2E8F0;
+  background-color: transparent;
+  color: #334155;
+  font-weight: 500;
+  border-radius: 0.5rem;
+  transition: all 0.15s ease-in-out;
+  cursor: pointer;
+}
+.btn-outline:hover {
+  background-color: #F8FAFC;
+  border-color: #CBD5E1;
+}
+
+.card {
+  background-color: #FFFFFF;
+  border-radius: 0.75rem;
+  box-shadow: 0 2px 10px 0 rgba(15, 22, 41, 0.04);
+  border: 1px solid #F1F5F9;
+  padding: 1.25rem;
+  transition: all 0.15s ease-in-out;
+}
+
+.table-header {
+  padding: 0.75rem 1rem;
+  text-align: left;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #64748B;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  background-color: #F8FAFC;
+  border-bottom: 1px solid #F1F5F9;
+}
+
+.table-cell {
+  padding: 0.875rem 1rem;
+  font-size: 0.875rem;
+  color: #334155;
+  white-space: nowrap;
+  border-bottom: 1px solid #F8FAFC;
+}
+
+/* Custom Scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #CBD5E1;
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #94A3B8;
+}

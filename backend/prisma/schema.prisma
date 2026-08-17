@@ -1,0 +1,564 @@
+// AI Interior Planner — Prisma Schema
+// All 20+ tables as specified in the implementation plan
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Auth & RBAC ───────────────────────────────────────────────────────────
+
+enum RoleName {
+  ADMIN
+  SALES_EXECUTIVE
+  DESIGNER
+  ESTIMATOR
+  PROCUREMENT_MANAGER
+  INSTALLATION_TEAM
+}
+
+model User {
+  id           String    @id @default(cuid())
+  name         String
+  email        String    @unique
+  passwordHash String
+  role         RoleName  @default(SALES_EXECUTIVE)
+  isActive     Boolean   @default(true)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  leads         Lead[]
+  projects      Project[]
+  tasks         Task[]
+  quotations    Quotation[]
+
+  @@map("users")
+}
+
+// ─── CRM ───────────────────────────────────────────────────────────────────
+
+enum LeadStatus {
+  NEW
+  CONTACTED
+  INTERESTED
+  NOT_INTERESTED
+  CONVERTED
+}
+
+enum LeadSource {
+  WEBSITE
+  INSTAGRAM
+  FACEBOOK
+  REFERRAL
+  WALK_IN
+  OTHER
+}
+
+model Lead {
+  id        String     @id @default(cuid())
+  name      String
+  email     String?
+  phone     String
+  source    LeadSource @default(WEBSITE)
+  status    LeadStatus @default(NEW)
+  notes     String?
+  assignedTo User?     @relation(fields: [assignedToId], references: [id])
+  assignedToId String?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  client    Client?
+
+  @@map("leads")
+}
+
+model Client {
+  id        String    @id @default(cuid())
+  name      String
+  email     String?
+  phone     String
+  address   String?
+  city      String?
+  gstNumber String?
+  lead      Lead?     @relation(fields: [leadId], references: [id])
+  leadId    String?   @unique
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  projects   Project[]
+  quotations Quotation[]
+
+  @@map("clients")
+}
+
+// ─── Projects ──────────────────────────────────────────────────────────────
+
+enum ProjectType {
+  BEDROOM
+  LIVING_ROOM
+  KITCHEN
+  BATHROOM
+  OFFICE
+  FULL_HOME
+  COMMERCIAL
+  OTHER
+}
+
+enum ProjectStatus {
+  LEAD
+  DESIGNING
+  IN_PROGRESS
+  QUOTATION
+  APPROVED
+  ORDERED
+  INSTALLATION
+  COMPLETED
+  ON_HOLD
+}
+
+model Project {
+  id          String        @id @default(cuid())
+  name        String
+  description String?
+  type        ProjectType   @default(BEDROOM)
+  status      ProjectStatus @default(DESIGNING)
+  client      Client        @relation(fields: [clientId], references: [id])
+  clientId    String
+  designer    User?         @relation(fields: [designerId], references: [id])
+  designerId  String?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  rooms       Room[]
+  quotations  Quotation[]
+  orders      Order[]
+  tasks       Task[]
+  installations Installation[]
+
+  @@map("projects")
+}
+
+// ─── Rooms & Layouts ───────────────────────────────────────────────────────
+
+enum RoomType {
+  BEDROOM
+  MASTER_BEDROOM
+  KIDS_BEDROOM
+  LIVING_ROOM
+  KITCHEN
+  BATHROOM
+  DINING_ROOM
+  HOME_OFFICE
+  BALCONY
+  OTHER
+}
+
+model Room {
+  id        String   @id @default(cuid())
+  name      String
+  type      RoomType @default(BEDROOM)
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  projectId String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  layouts   RoomLayout[]
+
+  @@map("rooms")
+}
+
+model RoomLayout {
+  id        String   @id @default(cuid())
+  room      Room     @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  roomId    String
+  length    Float    // in feet
+  width     Float    // in feet
+  height    Float    // in feet
+  version   Int      @default(1)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  items     LayoutItem[]
+
+  @@map("room_layouts")
+}
+
+model LayoutItem {
+  id              String     @id @default(cuid())
+  layout          RoomLayout @relation(fields: [roomLayoutId], references: [id], onDelete: Cascade)
+  roomLayoutId    String
+  furnitureItem   FurnitureCatalog @relation(fields: [furnitureItemId], references: [id])
+  furnitureItemId String
+  x               Float      // position in feet from left wall
+  y               Float      // position in feet from top wall
+  rotation        Float      @default(0) // degrees
+  widthFt         Float      // rendered width in feet
+  heightFt        Float      // rendered height in feet (depth)
+  parentGroupId   String?    // for grouping items
+  customizations  Json?      // { materialId, finishId, colorId, hardwareId, internalSetup, softClose }
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+
+  @@map("layout_items")
+}
+
+// ─── Furniture Catalog ─────────────────────────────────────────────────────
+
+model FurnitureCategory {
+  id        String   @id @default(cuid())
+  name      String   @unique // Beds, Wardrobes, Sofas, Tables, Doors, Windows, Decor, Others
+  icon      String?
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+
+  items     FurnitureCatalog[]
+
+  @@map("furniture_categories")
+}
+
+model FurnitureCatalog {
+  id          String            @id @default(cuid())
+  name        String
+  category    FurnitureCategory @relation(fields: [categoryId], references: [id])
+  categoryId  String
+  defaultWidthFt  Float        // default width in feet
+  defaultHeightFt Float        // default height/depth in feet
+  defaultHeightM  Float        // actual height in feet (vertical, for display)
+  basePrice   Float            // base price in INR
+  unit        String           @default("piece")
+  description String?
+  imageUrl    String?
+  isActive    Boolean          @default(true)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  layoutItems   LayoutItem[]
+  quotationItems QuotationItem[]
+
+  @@map("furniture_catalog")
+}
+
+// ─── Materials & Customization ─────────────────────────────────────────────
+
+model Material {
+  id          String   @id @default(cuid())
+  name        String   @unique // Plywood 19mm, Plywood 12mm, Sunmica-Walnut, etc.
+  category    String   // Boards, Laminates, Hardware
+  pricePerSqFt Float   // INR per sq ft
+  unit        String   @default("sq ft")
+  description String?
+  createdAt   DateTime @default(now())
+
+  @@map("materials")
+}
+
+model Finish {
+  id          String   @id @default(cuid())
+  name        String   @unique // Matte, Gloss, Satin, Texture, etc.
+  priceAdder  Float    @default(0) // additional INR per sq ft
+  createdAt   DateTime @default(now())
+
+  @@map("finishes")
+}
+
+model Color {
+  id          String   @id @default(cuid())
+  name        String
+  hexCode     String
+  category    String   @default("General")
+  createdAt   DateTime @default(now())
+
+  @@map("colors")
+}
+
+model HardwareOption {
+  id          String   @id @default(cuid())
+  name        String   // Gold Handles, Silver Handles, etc.
+  type        String   // Handle, Hinge, Lock
+  priceAdder  Float    @default(0)
+  createdAt   DateTime @default(now())
+
+  @@map("hardware_options")
+}
+
+// ─── Pricing Rules ─────────────────────────────────────────────────────────
+
+model PricingRule {
+  id          String   @id @default(cuid())
+  name        String
+  ruleType    String   // LABOR_RATE, TRANSPORT, INSTALLATION, CONTINGENCY
+  roomType    RoomType?
+  value       Float    // INR amount or percentage
+  unit        String   @default("fixed") // fixed, per_sqft, percentage
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+
+  @@map("pricing_rules")
+}
+
+// ─── Quotations ────────────────────────────────────────────────────────────
+
+enum QuotationStatus {
+  DRAFT
+  SENT
+  APPROVED
+  REJECTED
+  REVISED
+}
+
+model Quotation {
+  id             String          @id @default(cuid())
+  quoteNumber    String          @unique
+  project        Project         @relation(fields: [projectId], references: [id])
+  projectId      String
+  client         Client          @relation(fields: [clientId], references: [id])
+  clientId       String
+  createdBy      User            @relation(fields: [createdById], references: [id])
+  createdById    String
+  status         QuotationStatus @default(DRAFT)
+  validUntil     DateTime?
+  itemsTotal     Float           @default(0)
+  materialCustomization Float   @default(0)
+  laborCharges   Float           @default(0)
+  transport      Float           @default(0)
+  otherCharges   Float           @default(0)
+  subTotal       Float           @default(0)
+  gstPercent     Float           @default(18)
+  gstAmount      Float           @default(0)
+  totalAmount    Float           @default(0)
+  profitMargin   Float           @default(15) // percent
+  discount       Float           @default(0)  // percent
+  contingency    Float           @default(5)  // percent
+  applyGst       Boolean         @default(true)
+  termsConditions String?
+  notes          String?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  items          QuotationItem[]
+  order          Order?
+
+  @@map("quotations")
+}
+
+model QuotationItem {
+  id              String          @id @default(cuid())
+  quotation       Quotation       @relation(fields: [quotationId], references: [id], onDelete: Cascade)
+  quotationId     String
+  furnitureItem   FurnitureCatalog? @relation(fields: [furnitureItemId], references: [id])
+  furnitureItemId String?
+  description     String
+  quantity        Int             @default(1)
+  rate            Float
+  amount          Float
+  sortOrder       Int             @default(0)
+  createdAt       DateTime        @default(now())
+
+  @@map("quotation_items")
+}
+
+// ─── Orders ────────────────────────────────────────────────────────────────
+
+enum OrderStatus {
+  CONFIRMED
+  IN_PROGRESS
+  ON_HOLD
+  COMPLETED
+  CANCELLED
+}
+
+model Order {
+  id          String      @id @default(cuid())
+  orderNumber String      @unique
+  project     Project     @relation(fields: [projectId], references: [id])
+  projectId   String
+  quotation   Quotation?  @relation(fields: [quotationId], references: [id])
+  quotationId String?     @unique
+  status      OrderStatus @default(CONFIRMED)
+  totalAmount Float
+  notes       String?
+  orderDate   DateTime    @default(now())
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  items       OrderItem[]
+
+  @@map("orders")
+}
+
+model OrderItem {
+  id          String   @id @default(cuid())
+  order       Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  orderId     String
+  description String
+  quantity    Int      @default(1)
+  rate        Float
+  amount      Float
+  vendorId    String?
+  status      String   @default("PENDING")
+  createdAt   DateTime @default(now())
+
+  @@map("order_items")
+}
+
+// ─── Inventory ─────────────────────────────────────────────────────────────
+
+model Inventory {
+  id          String   @id @default(cuid())
+  name        String
+  category    String
+  unit        String   @default("piece")
+  stock       Float    @default(0)
+  unitPrice   Float    // INR
+  reorderLevel Float   @default(10)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  transactions InventoryTransaction[]
+
+  @@map("inventory")
+}
+
+model InventoryTransaction {
+  id          String    @id @default(cuid())
+  inventory   Inventory @relation(fields: [inventoryId], references: [id])
+  inventoryId String
+  type        String    // IN, OUT, ADJUSTMENT
+  quantity    Float
+  notes       String?
+  createdAt   DateTime  @default(now())
+
+  @@map("inventory_transactions")
+}
+
+// ─── Vendors ───────────────────────────────────────────────────────────────
+
+model Vendor {
+  id          String   @id @default(cuid())
+  name        String
+  contactName String?
+  email       String?
+  phone       String?
+  address     String?
+  gstNumber   String?
+  category    String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  purchaseOrders PurchaseOrder[]
+
+  @@map("vendors")
+}
+
+model PurchaseOrder {
+  id          String   @id @default(cuid())
+  poNumber    String   @unique
+  vendor      Vendor   @relation(fields: [vendorId], references: [id])
+  vendorId    String
+  status      String   @default("PENDING")
+  totalAmount Float
+  orderedAt   DateTime @default(now())
+  expectedAt  DateTime?
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("purchase_orders")
+}
+
+// ─── Installations ─────────────────────────────────────────────────────────
+
+model Installation {
+  id          String   @id @default(cuid())
+  project     Project  @relation(fields: [projectId], references: [id])
+  projectId   String
+  scheduledAt DateTime?
+  completedAt DateTime?
+  status      String   @default("PENDING")
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  photos      InstallationPhoto[]
+
+  @@map("installations")
+}
+
+model InstallationPhoto {
+  id             String       @id @default(cuid())
+  installation   Installation @relation(fields: [installationId], references: [id], onDelete: Cascade)
+  installationId String
+  url            String
+  caption        String?
+  createdAt      DateTime     @default(now())
+
+  @@map("installation_photos")
+}
+
+// ─── Payments ──────────────────────────────────────────────────────────────
+
+model Payment {
+  id          String   @id @default(cuid())
+  projectId   String
+  amount      Float
+  method      String   // CASH, CHEQUE, UPI, NEFT, RTGS
+  reference   String?
+  paidAt      DateTime @default(now())
+  notes       String?
+  createdAt   DateTime @default(now())
+
+  @@map("payments")
+}
+
+// ─── Tasks ─────────────────────────────────────────────────────────────────
+
+model Task {
+  id          String   @id @default(cuid())
+  title       String
+  description String?
+  project     Project? @relation(fields: [projectId], references: [id])
+  projectId   String?
+  assignedTo  User?    @relation(fields: [assignedToId], references: [id])
+  assignedToId String?
+  dueDate     DateTime?
+  isDone      Boolean  @default(false)
+  priority    String   @default("MEDIUM") // LOW, MEDIUM, HIGH
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("tasks")
+}
+
+// ─── AI ────────────────────────────────────────────────────────────────────
+
+model AiRecommendation {
+  id          String   @id @default(cuid())
+  projectId   String
+  roomType    String
+  budget      Float?
+  style       String?  // Modern, Minimal, Classic, Boho
+  recommendations Json // array of recommended items
+  confidence  Float?
+  createdAt   DateTime @default(now())
+
+  @@map("ai_recommendations")
+}
+
+model AnalyticsSnapshot {
+  id            String   @id @default(cuid())
+  snapshotDate  DateTime @default(now())
+  totalRevenue  Float    @default(0)
+  totalLeads    Int      @default(0)
+  totalProjects Int      @default(0)
+  totalOrders   Int      @default(0)
+  conversionRate Float   @default(0)
+  metadata      Json?
+
+  @@map("analytics_snapshots")
+}
