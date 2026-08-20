@@ -31,6 +31,8 @@ import { useLayoutStore } from '../stores/useLayoutStore';
 import { apiService } from '../services/api';
 import { FurnitureCatalogItem, FurnitureCategory, LayoutItem } from '../types';
 import toast from 'react-hot-toast';
+import { Scene3D } from '../components/studio/Scene3D';
+import { PhotoReconstructionPanel } from '../components/studio/PhotoReconstructionPanel';
 
 export const DesignStudioPage: React.FC = () => {
   const navigate = useNavigate();
@@ -60,6 +62,7 @@ export const DesignStudioPage: React.FC = () => {
   const [activeCategory, setActiveCategory] = useState<string>('cat-all');
   const [catalogItems, setCatalogItems] = useState<FurnitureCatalogItem[]>([]);
   const [isDraggingOver, setIsDraggingOver] = useState(false);
+  const [isPhotoWorkflowOpen, setIsPhotoWorkflowOpen] = useState(false);
 
   const canvasContainerRef = useRef<HTMLDivElement>(null);
   const selectedItem = items.find((i) => i.id === selectedItemId);
@@ -297,6 +300,9 @@ export const DesignStudioPage: React.FC = () => {
 
         {/* Right Action: 3D View & Proceed to Pricing */}
         <div className="flex items-center gap-2.5">
+          <button onClick={() => setIsPhotoWorkflowOpen(true)} className="px-3.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 border border-primary/25 text-primary hover:bg-indigo-50">
+            <Sparkles className="w-3.5 h-3.5" /><span>Photo → 3D</span>
+          </button>
           <button
             onClick={toggle3DView}
             className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all ${
@@ -386,20 +392,9 @@ export const DesignStudioPage: React.FC = () => {
           {/* Canvas Blueprint Grid Background */}
           <div className="absolute inset-0 opacity-15 bg-[radial-gradient(#64748B_1px,transparent_1px)] [background-size:16px_16px]" />
 
-          {/* 3D Visualizer Mode Stub / Isometric Preview */}
+          {/* The 3D scene uses the same Zustand layout objects as the 2D plan. */}
           {is3DView ? (
-            <div className="relative z-10 w-full h-full flex flex-col items-center justify-center animate-fade-in text-center p-6 bg-slate-900/90 rounded-xl text-white">
-              <Box className="w-16 h-16 text-primary mb-3 animate-bounce" />
-              <h3 className="text-base font-bold text-white">3D Extruded Room Visualization</h3>
-              <p className="text-xs text-slate-400 max-w-sm mt-1">
-                Parametric height extrusion ({heightFt} ft walls). Items rendered with real-world 3D bounding geometry and materials.
-              </p>
-              <div className="mt-5 flex gap-2">
-                <button onClick={toggle3DView} className="btn-primary text-xs px-4 py-2">
-                  Switch to 2D Plan
-                </button>
-              </div>
-            </div>
+            <div className="relative z-10 h-full w-full"><Scene3D lengthFt={lengthFt} widthFt={widthFt} heightFt={heightFt} items={items} selectedItemId={selectedItemId} onSelect={(itemId) => selectItem(itemId || null)} /></div>
           ) : (
             /* 2D Floor Plan Canvas (To Scale) */
             <div 
@@ -587,6 +582,7 @@ export const DesignStudioPage: React.FC = () => {
         </div>
 
       </div>
+      {isPhotoWorkflowOpen && <PhotoReconstructionPanel onClose={() => setIsPhotoWorkflowOpen(false)} />}
     </div>
   );
 };

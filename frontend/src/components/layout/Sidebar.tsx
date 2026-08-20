@@ -14,14 +14,15 @@ import {
   Settings, 
   Home,
   LogOut,
-  Sparkles
+  Sparkles,
+  type LucideIcon
 } from 'lucide-react';
 import { useAuthStore } from '../../stores/useAuthStore';
 
 interface NavItem {
   name: string;
   path: string;
-  icon: React.ElementType;
+  icon: LucideIcon;
 }
 
 const navItems: NavItem[] = [

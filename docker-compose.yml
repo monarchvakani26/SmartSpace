@@ -1,5 +1,3 @@
-version: '3.9'
-
 services:
   db:
     image: postgres:16-alpine
@@ -44,14 +42,14 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      args:
+        VITE_API_BASE_URL: http://localhost:4000
     container_name: aip_frontend
     restart: unless-stopped
     depends_on:
       - backend
-    environment:
-      VITE_API_BASE_URL: http://localhost:4000
     ports:
-      - '5173:5173'
+      - '5173:80'
 
   ai-service:
     build:

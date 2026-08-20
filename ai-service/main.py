@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Optional, Dict, Any
@@ -39,6 +39,42 @@ class LayoutOptimizationRequest(BaseModel):
     room_width_ft: float
     items: List[Dict[str, Any]]
     walkway_clearance_ft: float = 2.5
+
+@app.post("/scene-analysis")
+async def scene_analysis(
+    image: UploadFile = File(...),
+    reference_width_ft: Optional[float] = Form(None)
+):
+    """Entry point for photo-to-3D processing.
+
+    This endpoint deliberately reports only verifiable analysis state. Plug a
+    depth/segmentation provider into the named pipeline stages before enabling
+    automatic object import; one uncalibrated photo cannot yield exact geometry.
+    """
+    if image.content_type not in {"image/jpeg", "image/png"}:
+        raise HTTPException(status_code=415, detail="Only JPEG and PNG interior photos are supported")
+    if reference_width_ft is not None and reference_width_ft <= 0:
+        raise HTTPException(status_code=422, detail="Reference width must be greater than zero")
+
+    data = await image.read()
+    if not data:
+        raise HTTPException(status_code=422, detail="Uploaded image is empty")
+    if len(data) > 15 * 1024 * 1024:
+        raise HTTPException(status_code=413, detail="Image must be 15 MB or smaller")
+
+    return {
+        "status": "received",
+        "approximate": True,
+        "reference_width_ft": reference_width_ft,
+        "stages": {
+            "upload": "complete",
+            "depth": "model_not_configured",
+            "segmentation": "model_not_configured",
+            "reconstruction": "awaiting_model_output"
+        },
+        "detected_objects": [],
+        "message": "The image was accepted. Configure a depth and segmentation model to produce an approximate editable scene."
+    }
 
 # ─── Endpoints ───
 
