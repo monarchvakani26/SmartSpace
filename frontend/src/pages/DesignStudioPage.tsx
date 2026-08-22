@@ -33,6 +33,7 @@ import { FurnitureCatalogItem, FurnitureCategory, LayoutItem } from '../types';
 import toast from 'react-hot-toast';
 import { Scene3D } from '../components/studio/Scene3D';
 import { PhotoReconstructionPanel } from '../components/studio/PhotoReconstructionPanel';
+import { clampAndSnap, collisionIds } from '../utils/layout3d';
 
 export const DesignStudioPage: React.FC = () => {
   const navigate = useNavigate();
@@ -66,6 +67,22 @@ export const DesignStudioPage: React.FC = () => {
 
   const canvasContainerRef = useRef<HTMLDivElement>(null);
   const selectedItem = items.find((i) => i.id === selectedItemId);
+  const invalidItemIds = collisionIds(items);
+
+  const updatePlacement = (itemId: string, updates: Partial<LayoutItem>) => {
+    const item = items.find(candidate => candidate.id === itemId);
+    if (!item) return;
+    const next = { ...item, ...updates };
+    const position = clampAndSnap(next, next.x, next.y, lengthFt, widthFt);
+    updateItem(itemId, { ...updates, ...position });
+  };
+  const saveLayout = async () => {
+    if (invalidItemIds.size) { toast.error('Resolve furniture collisions before saving'); return; }
+    try {
+      await apiService.saveRoomLayout(useLayoutStore.getState().roomId, { length: lengthFt, width: widthFt, height: heightFt, items });
+      toast.success('Layout saved');
+    } catch { toast.error('Could not save layout. Check that this room exists on the server.'); }
+  };
 
   useEffect(() => {
     apiService.getFurnitureCategories().then(setCategories);
@@ -168,10 +185,7 @@ export const DesignStudioPage: React.FC = () => {
     const newXFt = Math.max(0, Math.min(lengthFt - 1, (e.clientX - dragOffset.x) / scale));
     const newYFt = Math.max(0, Math.min(widthFt - 1, (e.clientY - dragOffset.y) / scale));
     
-    updateItem(draggingCanvasItemId, {
-      x: parseFloat(newXFt.toFixed(1)),
-      y: parseFloat(newYFt.toFixed(1)),
-    });
+    updatePlacement(draggingCanvasItemId, { x: newXFt, y: newYFt });
   };
 
   const handleCanvasMouseUp = () => {
@@ -300,6 +314,7 @@ export const DesignStudioPage: React.FC = () => {
 
         {/* Right Action: 3D View & Proceed to Pricing */}
         <div className="flex items-center gap-2.5">
+          <button onClick={saveLayout} className="px-3.5 py-1.5 rounded-lg text-xs font-semibold border border-emerald-200 text-emerald-700 hover:bg-emerald-50">Save Layout</button>
           <button onClick={() => setIsPhotoWorkflowOpen(true)} className="px-3.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 border border-primary/25 text-primary hover:bg-indigo-50">
             <Sparkles className="w-3.5 h-3.5" /><span>Photo → 3D</span>
           </button>
@@ -394,7 +409,7 @@ export const DesignStudioPage: React.FC = () => {
 
           {/* The 3D scene uses the same Zustand layout objects as the 2D plan. */}
           {is3DView ? (
-            <div className="relative z-10 h-full w-full"><Scene3D lengthFt={lengthFt} widthFt={widthFt} heightFt={heightFt} items={items} selectedItemId={selectedItemId} onSelect={(itemId) => selectItem(itemId || null)} /></div>
+            <div className="relative z-10 h-full w-full"><Scene3D lengthFt={lengthFt} widthFt={widthFt} heightFt={heightFt} items={items} selectedItemId={selectedItemId} onSelect={(itemId) => selectItem(itemId || null)} onUpdate={updatePlacement} /></div>
           ) : (
             /* 2D Floor Plan Canvas (To Scale) */
             <div 
@@ -475,6 +490,7 @@ export const DesignStudioPage: React.FC = () => {
           <div className="absolute bottom-3 left-3 bg-white/90 backdrop-blur px-2.5 py-1 rounded-lg text-[10px] font-semibold text-slate-700 shadow-sm border border-slate-200">
             Scale: 1 ft = {Math.round(pxScale)}px • {items.length} items placed
           </div>
+          {invalidItemIds.size > 0 && <div className="absolute bottom-3 right-3 rounded-lg border border-red-200 bg-red-50 px-2.5 py-1 text-[10px] font-semibold text-red-700">{invalidItemIds.size} item(s) overlap — reposition before saving</div>}
         </div>
 
         {/* Right Panel: Properties Inspector (Reference Screen 6 Right) */}

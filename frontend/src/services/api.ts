@@ -175,6 +175,10 @@ function saveDB(db: MockDB) {
 // ─── Unified Data Services ───
 
 export const apiService = {
+  saveRoomLayout: async (roomId: string, layout: { length: number; width: number; height: number; items: unknown[] }) => {
+    const res = await apiClient.patch(`/rooms/${roomId}/layout`, layout);
+    return res.data;
+  },
   // Auth
   login: async (email: string, _password: string): Promise<{ token: string; user: User }> => {
     try {
