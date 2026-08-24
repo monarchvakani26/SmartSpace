@@ -1,6 +1,13 @@
 import { LayoutItem } from '../types';
 
-/** The canonical plan unit is feet. Three world units intentionally equal one foot. */
+/**
+ * The persisted plan unit is feet (the existing Prisma schema uses feet).
+ * Three.js uses the same scale: one world unit is one foot.  Conversion helpers
+ * keep the UI/API boundary explicit when a site measurement is supplied in mm.
+ */
+export const MM_PER_FOOT = 304.8;
+export const mmToFeet = (mm: number) => mm / MM_PER_FOOT;
+export const feetToMm = (feet: number) => feet * MM_PER_FOOT;
 export const feetToWorld = (feet: number) => feet;
 export const worldToFeet = (world: number) => world;
 export const layout2DTo3D = (item: LayoutItem) => ({ x: feetToWorld(item.x + item.widthFt / 2), y: feetToWorld((item.verticalHeightFt || 2.5) / 2), z: feetToWorld(item.y + item.heightFt / 2) });
@@ -23,3 +30,34 @@ export function footprint(item: LayoutItem) {
 }
 export function checkCollision(a: LayoutItem, b: LayoutItem) { const A = footprint(a), B = footprint(b); return A.left < B.right && A.right > B.left && A.top < B.bottom && A.bottom > B.top; }
 export function collisionIds(items: LayoutItem[]) { const invalid = new Set<string>(); for (let i = 0; i < items.length; i++) for (let j = i + 1; j < items.length; j++) if (checkCollision(items[i], items[j])) { invalid.add(items[i].id); invalid.add(items[j].id); } return invalid; }
+
+export interface DesignAnalysis {
+  roomAreaSqFt: number; occupiedAreaSqFt: number; freeAreaSqFt: number;
+  utilizationPercent: number; walkablePercent: number; collisionPairs: Array<[LayoutItem, LayoutItem]>;
+  boundaryItemIds: string[]; recommendation: string;
+}
+
+/** A 1 ft grid is intentionally conservative and derived entirely from the live layout. */
+export function analyzeLayout(items: LayoutItem[], lengthFt: number, widthFt: number): DesignAnalysis {
+  const roomAreaSqFt = lengthFt * widthFt;
+  const collisionPairs: Array<[LayoutItem, LayoutItem]> = [];
+  const boundaryItemIds = items.filter(item => {
+    const box = footprint(item);
+    return box.left < 0 || box.top < 0 || box.right > lengthFt || box.bottom > widthFt;
+  }).map(item => item.id);
+  for (let i = 0; i < items.length; i++) for (let j = i + 1; j < items.length; j++) if (checkCollision(items[i], items[j])) collisionPairs.push([items[i], items[j]]);
+  const occupiedAreaSqFt = items.reduce((sum, item) => sum + item.widthFt * item.heightFt, 0);
+  let total = 0, blocked = 0;
+  for (let x = .5; x < lengthFt; x += 1) for (let y = .5; y < widthFt; y += 1) {
+    total++;
+    if (items.some(item => { const box = footprint(item); return x >= box.left && x <= box.right && y >= box.top && y <= box.bottom; })) blocked++;
+  }
+  const walkablePercent = total ? ((total - blocked) / total) * 100 : 0;
+  const utilizationPercent = roomAreaSqFt ? (occupiedAreaSqFt / roomAreaSqFt) * 100 : 0;
+  const pair = collisionPairs[0];
+  const recommendation = pair ? `Move ${pair[1].name} away from ${pair[0].name}; the current footprints overlap.`
+    : boundaryItemIds.length ? `Move ${items.find(item => item.id === boundaryItemIds[0])?.name} fully inside the room boundary.`
+    : walkablePercent < 45 ? 'Reduce or reposition furniture to restore a clear walking route.'
+    : 'Layout is spatially valid. Keep wall-aligned storage to preserve the central walking area.';
+  return { roomAreaSqFt, occupiedAreaSqFt, freeAreaSqFt: Math.max(0, roomAreaSqFt - occupiedAreaSqFt), utilizationPercent, walkablePercent, collisionPairs, boundaryItemIds, recommendation };
+}

@@ -33,7 +33,7 @@ import { FurnitureCatalogItem, FurnitureCategory, LayoutItem } from '../types';
 import toast from 'react-hot-toast';
 import { Scene3D } from '../components/studio/Scene3D';
 import { PhotoReconstructionPanel } from '../components/studio/PhotoReconstructionPanel';
-import { clampAndSnap, collisionIds } from '../utils/layout3d';
+import { analyzeLayout, clampAndSnap, collisionIds } from '../utils/layout3d';
 
 export const DesignStudioPage: React.FC = () => {
   const navigate = useNavigate();
@@ -68,6 +68,7 @@ export const DesignStudioPage: React.FC = () => {
   const canvasContainerRef = useRef<HTMLDivElement>(null);
   const selectedItem = items.find((i) => i.id === selectedItemId);
   const invalidItemIds = collisionIds(items);
+  const analysis = analyzeLayout(items, lengthFt, widthFt);
 
   const updatePlacement = (itemId: string, updates: Partial<LayoutItem>) => {
     const item = items.find(candidate => candidate.id === itemId);
@@ -111,18 +112,18 @@ export const DesignStudioPage: React.FC = () => {
     const pixelY = e.clientY - rect.top;
     
     // Scale factors (Canvas is centered and fixed aspect ratio)
-    const scale = 36; // 36px per foot
-    const dropXFt = Math.max(0.5, Math.min(lengthFt - 2, (pixelX - 60) / scale));
-    const dropYFt = Math.max(0.5, Math.min(widthFt - 2, (pixelY - 60) / scale));
 
     try {
       const itemData: FurnitureCatalogItem = JSON.parse(e.dataTransfer.getData('application/json'));
+      const dropXFt = (pixelX / rect.width) * lengthFt - itemData.defaultWidthFt / 2;
+      const dropYFt = (pixelY / rect.height) * widthFt - itemData.defaultHeightFt / 2;
+      const position = clampAndSnap({ furnitureItemId: itemData.id, name: itemData.name, category: itemData.categoryName, x: dropXFt, y: dropYFt, rotation: 0, widthFt: itemData.defaultWidthFt, heightFt: itemData.defaultHeightFt, verticalHeightFt: itemData.defaultHeightM, id: '' }, dropXFt, dropYFt, lengthFt, widthFt);
       const newId = addItem({
         furnitureItemId: itemData.id,
         name: itemData.name,
         category: itemData.categoryName,
-        x: parseFloat(dropXFt.toFixed(1)),
-        y: parseFloat(dropYFt.toFixed(1)),
+        x: position.x,
+        y: position.y,
         rotation: 0,
         widthFt: itemData.defaultWidthFt,
         heightFt: itemData.defaultHeightFt,
@@ -173,17 +174,16 @@ export const DesignStudioPage: React.FC = () => {
     }
 
     setDraggingCanvasItemId(item.id);
-    setDragOffset({
-      x: e.clientX - item.x * 36,
-      y: e.clientY - item.y * 36,
-    });
+    const rect = canvasContainerRef.current?.getBoundingClientRect();
+    setDragOffset({ x: e.clientX - (rect?.left || 0) - item.x * pxScale, y: e.clientY - (rect?.top || 0) - item.y * pxScale });
   };
 
   const handleCanvasMouseMove = (e: React.MouseEvent) => {
     if (!draggingCanvasItemId) return;
-    const scale = 36;
-    const newXFt = Math.max(0, Math.min(lengthFt - 1, (e.clientX - dragOffset.x) / scale));
-    const newYFt = Math.max(0, Math.min(widthFt - 1, (e.clientY - dragOffset.y) / scale));
+    const rect = canvasContainerRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    const newXFt = (e.clientX - rect.left - dragOffset.x) / pxScale;
+    const newYFt = (e.clientY - rect.top - dragOffset.y) / pxScale;
     
     updatePlacement(draggingCanvasItemId, { x: newXFt, y: newYFt });
   };
@@ -272,6 +272,17 @@ export const DesignStudioPage: React.FC = () => {
             <Trash2 className="w-3.5 h-3.5" />
             <span>Delete</span>
           </button>
+          <button
+            onClick={() => {
+              if (!selectedItem) return toast.error('Select an item to duplicate');
+              const position = clampAndSnap(selectedItem, selectedItem.x + 0.5, selectedItem.y + 0.5, lengthFt, widthFt);
+              const id = addItem({ ...selectedItem, ...position });
+              selectItem(id);
+              toast.success(`${selectedItem.name} duplicated`);
+            }}
+            title="Duplicate selected item"
+            className="px-2 py-1.5 rounded-lg hover:bg-slate-100 text-slate-600 text-xs font-semibold"
+          >Duplicate</button>
 
           <div className="h-5 w-px bg-slate-200 mx-1" />
 
@@ -409,7 +420,7 @@ export const DesignStudioPage: React.FC = () => {
 
           {/* The 3D scene uses the same Zustand layout objects as the 2D plan. */}
           {is3DView ? (
-            <div className="relative z-10 h-full w-full"><Scene3D lengthFt={lengthFt} widthFt={widthFt} heightFt={heightFt} items={items} selectedItemId={selectedItemId} onSelect={(itemId) => selectItem(itemId || null)} onUpdate={updatePlacement} /></div>
+            <div className="relative z-10 h-full w-full"><Scene3D lengthFt={lengthFt} widthFt={widthFt} heightFt={heightFt} items={items} selectedItemId={selectedItemId} activeTool={activeTool} onSelect={(itemId) => selectItem(itemId || null)} onUpdate={updatePlacement} /></div>
           ) : (
             /* 2D Floor Plan Canvas (To Scale) */
             <div 
@@ -495,6 +506,12 @@ export const DesignStudioPage: React.FC = () => {
 
         {/* Right Panel: Properties Inspector (Reference Screen 6 Right) */}
         <div className="lg:col-span-3 card !p-5 h-[620px] flex flex-col justify-between overflow-y-auto">
+          <div className="mb-4 rounded-xl border border-indigo-100 bg-indigo-50/60 p-3 text-xs">
+            <div className="mb-2 flex items-center gap-1.5 font-bold text-primary"><Sparkles className="h-3.5 w-3.5" /> Live design analysis</div>
+            <div className="grid grid-cols-2 gap-y-1.5 text-slate-600"><span>{items.length} furniture items</span><span>{analysis.walkablePercent.toFixed(0)}% walkable</span><span>{analysis.utilizationPercent.toFixed(0)}% utilized</span><span>{analysis.freeAreaSqFt.toFixed(1)} ft² free</span></div>
+            <p className={`mt-2 font-semibold ${analysis.collisionPairs.length || analysis.boundaryItemIds.length ? 'text-amber-700' : 'text-emerald-700'}`}>{analysis.collisionPairs.length ? `⚠ ${analysis.collisionPairs.length} collision${analysis.collisionPairs.length > 1 ? 's' : ''}` : analysis.boundaryItemIds.length ? '⚠ Boundary issue' : '✓ Layout boundary valid'}</p>
+            <p className="mt-1 text-[11px] leading-relaxed text-slate-600">{analysis.recommendation}</p>
+          </div>
           {selectedItem ? (
             <div className="space-y-4">
               <div className="pb-3 border-b border-slate-100">

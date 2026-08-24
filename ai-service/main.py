@@ -2,6 +2,9 @@ from fastapi import FastAPI, HTTPException, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Optional, Dict, Any
+from pathlib import Path
+import joblib
+import pandas as pd
 
 app = FastAPI(
     title="AI Interior Planner — AI/ML Service",
@@ -16,6 +19,13 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+MODEL_PATH = Path(__file__).parent / "models" / "cost_prediction.pkl"
+def load_cost_model():
+    """A prediction is only served from a persisted trained model; no formula fallback."""
+    if not MODEL_PATH.exists():
+        return None
+    return joblib.load(MODEL_PATH)
 
 # ─── Data Models ───
 
@@ -114,25 +124,31 @@ def recommend_furniture_materials(req: RecommendationRequest):
 
 @app.post("/predict-cost")
 def predict_project_cost(req: CostPredictionRequest):
-    """
-    ML Cost Prediction: Regresses expected cost based on spatial dimensions, item density, and material tier.
-    """
+    """Predict using the persisted model produced by models/train_cost_model.py."""
+    model_bundle = load_cost_model()
+    if model_bundle is None:
+        raise HTTPException(status_code=503, detail="Cost prediction model is not configured. Train ai-service/models/train_cost_model.py with approved project data first.")
     area = req.length_ft * req.width_ft
-    base_rate_per_sqft = 1200 if req.material_tier == "LUXURY" else 850
-    estimated_cost = (area * base_rate_per_sqft) + (req.item_count * 15000)
-    
+    features = pd.DataFrame([{
+        "room_area": area, "furniture_count": req.item_count,
+        "material_type": req.material_tier, "labor_cost": 0,
+        "location": req.city, "project_type": req.room_type,
+    }])
+    estimated_cost = float(model_bundle["pipeline"].predict(features)[0])
+    metrics = model_bundle["metrics"]
     return {
         "predicted_cost_inr": round(estimated_cost),
         "predicted_range": {
             "min": round(estimated_cost * 0.92),
             "max": round(estimated_cost * 1.08)
         },
-        "model_used": "XGBoost Regressor v1.2",
-        "r2_score": 0.912,
+        "model_used": model_bundle["model_name"],
+        "metrics": metrics,
+        "training_data": model_bundle["training_data"],
         "features": {
             "floor_area_sqft": area,
-            "item_density": round(req.item_count / (area / 100), 2),
-            "city_multiplier": 1.15 if req.city == "Mumbai" else 1.0
+            "item_density": round(req.item_count / (area / 100), 2) if area else 0,
+            "location": req.city
         }
     }
 
