@@ -45,11 +45,12 @@ export const StudioAICoach: React.FC<Props> = ({
   const [busy, setBusy] = useState<'furnish' | 'optimize' | null>(null);
   const [style, setStyle] = useState('MODERN');
   const [budget, setBudget] = useState('MEDIUM');
+  const [lastMethod, setLastMethod] = useState<string>('rules / heuristic');
   const [messages, setMessages] = useState<CoachMessage[]>([
     {
       id: 'welcome',
       role: 'ai',
-      text: 'I can furnish this room, untangle overlaps, or fix the issue highlighted in layout check.',
+      text: 'Constraint coach: furnish (rules), optimize (greedy AABB), cost (regressor or formula). Methods are labeled — not black-box CV.',
     },
   ]);
 
@@ -91,9 +92,11 @@ export const StudioAICoach: React.FC<Props> = ({
       onReplaceItems(withIds, true);
       setTimeout(() => onReplaceItems(withIds, false), 700);
 
+      const method = result.source === 'ai' ? 'rules · API' : 'rules · local';
+      setLastMethod(method);
       push(
         'ai',
-        `Placed ${withIds.length} pieces (${result.source === 'ai' ? 'AI' : 'studio'} rules, ${(result.confidence_score * 100).toFixed(0)}% confidence). Drag to refine.`
+        `Placed ${withIds.length} pieces [${method}] · confidence ${(result.confidence_score * 100).toFixed(0)}%. Drag to refine.`
       );
       toast.success('Room furnished');
     } catch {
@@ -120,11 +123,13 @@ export const StudioAICoach: React.FC<Props> = ({
       onSetPositions(result.optimized_layout, true);
       setTimeout(() => onSetPositions(result.optimized_layout, false), 650);
       const n = result.issues_found.length;
+      const method = result.source === 'ai' ? 'heuristic-optimizer · API' : 'heuristic-optimizer · local';
+      setLastMethod(method);
       push(
         'ai',
         n
-          ? `Resolved ${n} issue${n > 1 ? 's' : ''} (${result.source}). Watch the pieces settle.`
-          : `Layout already clean (${result.source}).`
+          ? `Resolved ${n} issue${n > 1 ? 's' : ''} [${method}]. Watch the pieces settle.`
+          : `Layout already clean [${method}].`
       );
       toast.success(n ? 'Layout optimized' : 'No conflicts found');
     } catch {
@@ -141,9 +146,14 @@ export const StudioAICoach: React.FC<Props> = ({
 
   return (
     <div className="flex flex-col h-full min-h-0">
-      <div className="flex items-center gap-2 mb-3">
-        <MessageCircle className="w-4 h-4 text-primary" />
-        <h3 className="font-display text-lg text-ink">AI coach</h3>
+      <div className="flex items-center justify-between gap-2 mb-3">
+        <div className="flex items-center gap-2">
+          <MessageCircle className="w-4 h-4 text-primary" />
+          <h3 className="font-display text-lg text-ink">Design coach</h3>
+        </div>
+        <span className="text-[9px] font-bold uppercase tracking-[0.1em] text-brass border border-brass/35 px-1.5 py-0.5">
+          {lastMethod}
+        </span>
       </div>
 
       <div className="flex-1 min-h-0 overflow-y-auto space-y-2 mb-3 pr-0.5">
@@ -169,7 +179,7 @@ export const StudioAICoach: React.FC<Props> = ({
       {(predictedCost != null || costRange) && (
         <div className="mb-3 p-2.5 border border-brass/30 bg-brass-soft/30 text-xs">
           <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-brass mb-0.5">
-            Cost whisper {costSource === 'ai' ? '· model' : '· estimate'}
+            Cost whisper · {costSource === 'ai' ? 'trained model or API heuristic' : 'local formula'}
           </p>
           <p className="font-display text-xl text-ink">
             ₹{(predictedCost || 0).toLocaleString('en-IN')}

@@ -32,7 +32,8 @@ export const PricingPage: React.FC = () => {
           <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-ink-muted mb-2">Studio</p>
           <h1 className="font-display text-4xl text-ink tracking-tight">Pricing</h1>
           <p className="text-sm text-ink-muted mt-2 max-w-md">
-            Cost from the layout and material specs — adjust margin, then quote.
+            Parametric client-side calc from the live layout (items + material adders + margin/GST).
+            Server engine available when backend layout IDs are persisted.
           </p>
         </div>
         <Link to={`/projects/${id || 'proj-1'}/design`} className="btn-outline flex items-center gap-2 text-sm self-start">

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { 
   Compass, 
   Users, 
@@ -8,7 +8,7 @@ import {
   FileText, 
   Package, 
   PackageCheck, 
-  BarChart3, 
+  FlaskConical, 
   LogOut,
   type LucideIcon
 } from 'lucide-react';
@@ -31,11 +31,15 @@ const deskNav: NavItem[] = [
   { name: 'Quotations', path: '/quotations', icon: FileText },
   { name: 'Orders', path: '/orders', icon: PackageCheck },
   { name: 'Materials', path: '/inventory', icon: Package },
-  { name: 'Reports', path: '/reports', icon: BarChart3 },
+];
+
+const evidenceNav: NavItem[] = [
+  { name: 'Evaluation', path: '/evaluation', icon: FlaskConical },
 ];
 
 export const Sidebar: React.FC = () => {
   const location = useLocation();
+  const navigate = useNavigate();
   const { user, logout } = useAuthStore();
 
   const isActive = (path: string) =>
@@ -70,7 +74,7 @@ export const Sidebar: React.FC = () => {
             SmartSpace
           </p>
           <p className="mt-1.5 text-[10px] font-semibold tracking-[0.18em] uppercase text-[#7A756C]">
-            Interior studio
+            Spatial studio
           </p>
         </Link>
       </div>
@@ -80,18 +84,21 @@ export const Sidebar: React.FC = () => {
           <p className="px-3 mb-2 text-[10px] font-bold uppercase tracking-[0.16em] text-[#5C574E]">
             Studio
           </p>
-          <div className="space-y-0.5">
-            {studioNav.map(renderLink)}
-          </div>
+          <div className="space-y-0.5">{studioNav.map(renderLink)}</div>
         </div>
 
         <div>
           <p className="px-3 mb-2 text-[10px] font-bold uppercase tracking-[0.16em] text-[#5C574E]">
             Desk
           </p>
-          <div className="space-y-0.5">
-            {deskNav.map(renderLink)}
-          </div>
+          <div className="space-y-0.5">{deskNav.map(renderLink)}</div>
+        </div>
+
+        <div>
+          <p className="px-3 mb-2 text-[10px] font-bold uppercase tracking-[0.16em] text-[#5C574E]">
+            Evidence
+          </p>
+          <div className="space-y-0.5">{evidenceNav.map(renderLink)}</div>
         </div>
       </nav>
 
@@ -100,11 +107,14 @@ export const Sidebar: React.FC = () => {
           <div className="min-w-0">
             <p className="text-xs font-semibold text-[#F7F6F2] truncate">{user?.name || 'Designer'}</p>
             <p className="text-[10px] text-[#7A756C] truncate capitalize">
-              {user?.role?.toLowerCase().replace('_', ' ') || 'Admin'}
+              {user?.role?.toLowerCase().replace('_', ' ') || 'Guest'}
             </p>
           </div>
           <button
-            onClick={logout}
+            onClick={() => {
+              logout();
+              navigate('/login', { replace: true });
+            }}
             title="Logout"
             className="p-1.5 text-[#7A756C] hover:text-brass-soft transition-colors"
           >

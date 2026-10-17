@@ -31,7 +31,7 @@ import toast from 'react-hot-toast';
 import { Scene3D } from '../components/studio/Scene3D';
 import { PhotoReconstructionPanel } from '../components/studio/PhotoReconstructionPanel';
 import { StudioAICoach } from '../components/studio/StudioAICoach';
-import { analyzeLayout, clampAndSnap, collisionIds } from '../utils/layout3d';
+import { analyzeLayout, clampAndSnap, collisionIds, walkabilityCells } from '../utils/layout3d';
 
 export const DesignStudioPage: React.FC = () => {
   const navigate = useNavigate();
@@ -50,6 +50,8 @@ export const DesignStudioPage: React.FC = () => {
     photoBackdropUrl,
     photoBackdropOpacity,
     isLayoutAnimating,
+    isImmersive,
+    showWalkability,
     addItem, 
     updateItem, 
     removeItem, 
@@ -63,6 +65,8 @@ export const DesignStudioPage: React.FC = () => {
     setItemsPositions,
     setRoomDimensions,
     setPhotoBackdrop,
+    setImmersive,
+    toggleWalkability,
   } = useLayoutStore();
 
   const [categories, setCategories] = useState<FurnitureCategory[]>([]);
@@ -79,6 +83,7 @@ export const DesignStudioPage: React.FC = () => {
   const selectedItem = items.find((i) => i.id === selectedItemId);
   const invalidItemIds = collisionIds(items);
   const analysis = analyzeLayout(items, lengthFt, widthFt);
+  const heatCells = showWalkability ? walkabilityCells(items, lengthFt, widthFt) : [];
 
   const updatePlacement = (itemId: string, updates: Partial<LayoutItem>) => {
     const item = items.find(candidate => candidate.id === itemId);
@@ -369,7 +374,21 @@ export const DesignStudioPage: React.FC = () => {
         <div className="flex items-center gap-2">
           <button onClick={saveLayout} className="px-3.5 py-1.5 text-xs font-semibold border border-primary/30 text-primary hover:bg-primary-50">Save</button>
           <button onClick={() => setIsPhotoWorkflowOpen(true)} className="px-3.5 py-1.5 text-xs font-semibold flex items-center gap-1.5 border border-brass/40 text-brass hover:bg-brass-soft/40">
-            <Sparkles className="w-3.5 h-3.5" /><span>Photo → 3D</span>
+            <Sparkles className="w-3.5 h-3.5" /><span>Photo → plan</span>
+          </button>
+          <button
+            type="button"
+            onClick={toggleWalkability}
+            className={`px-3.5 py-1.5 text-xs font-semibold border ${showWalkability ? 'bg-primary text-[#F7F6F2] border-primary' : 'border-surface-border text-ink-muted'}`}
+          >
+            Walkability
+          </button>
+          <button
+            type="button"
+            onClick={() => setImmersive(true)}
+            className="px-3.5 py-1.5 text-xs font-semibold border border-surface-border text-ink-muted hover:border-primary hover:text-primary"
+          >
+            Present
           </button>
           <button
             onClick={toggle3DView}
@@ -393,9 +412,9 @@ export const DesignStudioPage: React.FC = () => {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 items-start min-h-[calc(100vh-8rem)]">
+      <div className={`grid grid-cols-1 gap-3 items-start min-h-[calc(100vh-8rem)] ${isImmersive ? 'lg:grid-cols-1' : 'lg:grid-cols-12'}`}>
         
-        <div className="lg:col-span-3 panel-quiet !p-0 overflow-hidden flex flex-col h-[calc(100vh-8rem)] min-h-[560px]">
+        {!isImmersive && <div className="lg:col-span-3 panel-quiet !p-0 overflow-hidden flex flex-col h-[calc(100vh-8rem)] min-h-[560px]">
           <div className="p-3.5 border-b border-surface-border">
             <h2 className="font-display text-lg text-ink">Furniture</h2>
             <p className="text-[11px] text-ink-muted">Drag onto the floor plan</p>
@@ -440,16 +459,15 @@ export const DesignStudioPage: React.FC = () => {
               </div>
             ))}
           </div>
-        </div>
+        </div>}
 
-        {/* Center Panel: 2D Interactive Layout Canvas (Reference Screen 6 Center) */}
         <div 
           ref={canvasContainerRef}
           onDragOver={(e) => { e.preventDefault(); setIsDraggingOver(true); }}
           onDragLeave={() => setIsDraggingOver(false)}
           onDrop={handleDrop}
           onClick={() => selectItem(null)}
-          className={`lg:col-span-6 h-[calc(100vh-8rem)] min-h-[560px] bg-[#C9B8A0]/45 border border-surface-border flex flex-col items-center justify-center relative overflow-hidden transition-all ${
+          className={`${isImmersive ? 'lg:col-span-1' : 'lg:col-span-6'} h-[calc(100vh-8rem)] min-h-[560px] bg-[#C9B8A0]/45 border border-surface-border flex flex-col items-center justify-center relative overflow-hidden transition-all ${
             isDraggingOver ? 'ring-2 ring-primary/50 bg-primary-50/40' : ''
           }`}
         >
@@ -457,7 +475,7 @@ export const DesignStudioPage: React.FC = () => {
 
           {/* The 3D scene uses the same Zustand layout objects as the 2D plan. */}
           {is3DView ? (
-            <div className="relative z-10 h-full w-full"><Scene3D lengthFt={lengthFt} widthFt={widthFt} heightFt={heightFt} items={items} selectedItemId={selectedItemId} activeTool={activeTool} onSelect={(itemId) => selectItem(itemId || null)} onUpdate={updatePlacement} /></div>
+            <div className="relative z-10 h-full w-full"><Scene3D lengthFt={lengthFt} widthFt={widthFt} heightFt={heightFt} items={items} selectedItemId={selectedItemId} activeTool={activeTool} onSelect={(itemId) => selectItem(itemId || null)} onUpdate={updatePlacement} presentMode={isImmersive} /></div>
           ) : (
             /* 2D Floor Plan Canvas (To Scale) */
             <div 
@@ -481,6 +499,19 @@ export const DesignStudioPage: React.FC = () => {
                 <div className="absolute inset-0 opacity-25 bg-[repeating-linear-gradient(90deg,#CBBFA8,#CBBFA8_20px,#B9AC95_20px,#B9AC95_40px)]" />
               )}
               <div className="absolute inset-0 opacity-15 bg-[radial-gradient(#5C574E_1px,transparent_1px)] [background-size:12px_12px] pointer-events-none" />
+
+              {showWalkability && heatCells.map((cell, idx) => (
+                <div
+                  key={`heat-${idx}`}
+                  className={`absolute pointer-events-none ${cell.blocked ? 'bg-[#9B3B2E]/35' : 'bg-primary/20'}`}
+                  style={{
+                    left: `${(cell.x - 0.5) * pxScale}px`,
+                    top: `${(cell.y - 0.5) * pxScale}px`,
+                    width: `${pxScale}px`,
+                    height: `${pxScale}px`,
+                  }}
+                />
+              ))}
 
               <div className="absolute -top-7 left-1/2 -translate-x-1/2 bg-surface-card px-2 py-0.5 border border-surface-border text-[11px] font-bold text-ink">
                 {lengthFt} ft
@@ -561,7 +592,7 @@ export const DesignStudioPage: React.FC = () => {
           {invalidItemIds.size > 0 && <div className="absolute bottom-3 right-3 border border-[#9B3B2E]/40 bg-[#9B3B2E]/10 px-2.5 py-1 text-[10px] font-semibold text-[#9B3B2E]">{invalidItemIds.size} overlap — fix before saving</div>}
         </div>
 
-        <div className="lg:col-span-3 panel-quiet !p-4 h-[calc(100vh-8rem)] min-h-[560px] flex flex-col overflow-hidden">
+        {!isImmersive && <div className="lg:col-span-3 panel-quiet !p-4 h-[calc(100vh-8rem)] min-h-[560px] flex flex-col overflow-hidden">
           <div className="flex gap-1 mb-3 border-b border-surface-border pb-2">
             <button
               type="button"
@@ -676,7 +707,7 @@ export const DesignStudioPage: React.FC = () => {
               </div>
             </div>
           )}
-        </div>
+        </div>}
 
       </div>
       {isPhotoWorkflowOpen && (

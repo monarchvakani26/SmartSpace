@@ -83,3 +83,19 @@ export function analyzeLayout(items: LayoutItem[], lengthFt: number, widthFt: nu
     : 'Layout is spatially valid. Keep wall-aligned storage to preserve the central walking area.';
   return { roomAreaSqFt, occupiedAreaSqFt, freeAreaSqFt: Math.max(0, roomAreaSqFt - occupiedAreaSqFt), utilizationPercent, walkablePercent, collisionPairs, boundaryItemIds, doorObstructions, score, recommendation };
 }
+
+/** 1 ft blocked cells for walkability heat overlay (normalized 0–1 room coords). */
+export function walkabilityCells(items: LayoutItem[], lengthFt: number, widthFt: number) {
+  const furniture = furnitureItems(items);
+  const cells: Array<{ x: number; y: number; blocked: boolean }> = [];
+  for (let x = 0.5; x < lengthFt; x += 1) {
+    for (let y = 0.5; y < widthFt; y += 1) {
+      const blocked = furniture.some((item) => {
+        const box = footprint(item);
+        return x >= box.left && x <= box.right && y >= box.top && y <= box.bottom;
+      });
+      cells.push({ x, y, blocked });
+    }
+  }
+  return cells;
+}

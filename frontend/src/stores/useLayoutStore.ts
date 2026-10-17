@@ -12,6 +12,8 @@ interface LayoutStore extends RoomLayoutState {
   photoBackdropUrl: string | null;
   photoBackdropOpacity: number;
   isLayoutAnimating: boolean;
+  isImmersive: boolean;
+  showWalkability: boolean;
 
   // Actions
   setRoomDimensions: (lengthFt: number, widthFt: number, heightFt: number) => void;
@@ -28,6 +30,8 @@ interface LayoutStore extends RoomLayoutState {
   setItemsPositions: (items: LayoutItem[], opts?: { animate?: boolean }) => void;
   setPhotoBackdrop: (url: string | null, opacity?: number) => void;
   setLayoutAnimating: (value: boolean) => void;
+  setImmersive: (value: boolean) => void;
+  toggleWalkability: () => void;
   
   // History
   undo: () => void;
@@ -117,6 +121,8 @@ export const useLayoutStore = create<LayoutStore>((set, get) => ({
   photoBackdropUrl: null,
   photoBackdropOpacity: 0.35,
   isLayoutAnimating: false,
+  isImmersive: false,
+  showWalkability: false,
   pricingSettings: {
     profitMargin: 20,
     discount: 5,
@@ -132,6 +138,8 @@ export const useLayoutStore = create<LayoutStore>((set, get) => ({
     set({ photoBackdropUrl: url, photoBackdropOpacity: opacity }),
 
   setLayoutAnimating: (value) => set({ isLayoutAnimating: value }),
+  setImmersive: (value) => set({ isImmersive: value }),
+  toggleWalkability: () => set((s) => ({ showWalkability: !s.showWalkability })),
 
   replaceItems: (items, opts) => {
     const { history, historyIndex } = get();

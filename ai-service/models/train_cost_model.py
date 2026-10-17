@@ -11,7 +11,11 @@ from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 from sklearn.model_selection import train_test_split
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder
-from xgboost import XGBRegressor
+try:
+    from xgboost import XGBRegressor
+    HAS_XGB = True
+except ImportError:
+    HAS_XGB = False
 
 REQUIRED = ["room_area", "furniture_count", "material_type", "labor_cost", "location", "project_type", "total_cost"]
 ROOT = Path(__file__).parent
@@ -31,10 +35,16 @@ def main():
     x_train, x_test, y_train, y_test = train_test_split(x, y, test_size=.2, random_state=42)
     numeric, categorical = ["room_area", "furniture_count", "labor_cost"], ["material_type", "location", "project_type"]
     preprocessing = ColumnTransformer([("num", SimpleImputer(strategy="median"), numeric), ("cat", Pipeline([("impute", SimpleImputer(strategy="most_frequent")), ("onehot", OneHotEncoder(handle_unknown="ignore"))]), categorical)])
-    candidates = [("Linear Regression", LinearRegression()), ("Random Forest", RandomForestRegressor(n_estimators=300, random_state=42)), ("XGBoost", XGBRegressor(n_estimators=300, max_depth=4, learning_rate=.05, random_state=42))]
+    candidates = [
+        ("Linear Regression", LinearRegression()),
+        ("Random Forest", RandomForestRegressor(n_estimators=300, random_state=42)),
+    ]
+    if HAS_XGB:
+        candidates.append(("XGBoost", XGBRegressor(n_estimators=300, max_depth=4, learning_rate=.05, random_state=42)))
     results = [score(name, Pipeline([("preprocess", preprocessing), ("model", model)]), x_train, x_test, y_train, y_test) for name, model in candidates]
     name, pipeline, metrics = min(results, key=lambda result: result[2]["mae"])
-    joblib.dump({"pipeline": pipeline, "model_name": name, "metrics": metrics, "training_data": {"rows": len(data), "source": str(Path(sys.argv[1]).name), "synthetic": False}}, ROOT / "cost_prediction.pkl")
-    print({"selected": name, "metrics": metrics})
+    synthetic = "synthetic" in Path(sys.argv[1]).name or "approved-project-costs" in Path(sys.argv[1]).name
+    joblib.dump({"pipeline": pipeline, "model_name": name, "metrics": metrics, "training_data": {"rows": len(data), "source": str(Path(sys.argv[1]).name), "synthetic": synthetic}}, ROOT / "cost_prediction.pkl")
+    print({"selected": name, "metrics": metrics, "xgboost": HAS_XGB})
 
 if __name__ == "__main__": main()

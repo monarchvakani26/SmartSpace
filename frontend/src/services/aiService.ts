@@ -390,12 +390,16 @@ export const aiService = {
     city?: string;
   }): Promise<CostPredictResult> {
     try {
-      const data = await postJson<Omit<CostPredictResult, 'source'>>('/predict-cost', {
-        ...params,
-        material_tier: params.material_tier || 'STANDARD',
-        city: params.city || 'Mumbai',
-      });
-      return { ...data, source: 'ai' };
+      const data = await postJson<Omit<CostPredictResult, 'source'> & { model_used?: string }>(
+        '/predict-cost',
+        {
+          ...params,
+          material_tier: params.material_tier || 'STANDARD',
+          city: params.city || 'Mumbai',
+        }
+      );
+      const isHeuristic = (data.model_used || '').toLowerCase().includes('heuristic');
+      return { ...data, source: isHeuristic ? 'local' : 'ai' };
     } catch {
       return localPredictCost(params);
     }

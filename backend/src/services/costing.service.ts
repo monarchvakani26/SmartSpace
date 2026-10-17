@@ -73,8 +73,12 @@ export async function generateItemList(roomLayoutId: string, options?: {
 
   const itemsTotal = items.reduce((s, i) => s + i.amount, 0);
 
-  // Material customization total
-  const materialCustomization = items.reduce((s, _i) => s + 0, 0); // computed above
+  // Material customization = sum of per-item custom adders already baked into rate
+  const materialCustomization = layout.items.reduce((sum, li) => {
+    const customs = li.customizations as { materialPricePerSqFt?: number } | null;
+    if (!customs?.materialPricePerSqFt) return sum;
+    return sum + customs.materialPricePerSqFt * li.widthFt * li.heightFt * 2;
+  }, 0);
 
   // Labor: lookup by room type
   const laborRule = await prisma.pricingRule.findFirst({

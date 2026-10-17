@@ -63,7 +63,7 @@ app.use((err: any, _req: express.Request, res: express.Response, _next: express.
 });
 
 app.listen(PORT, () => {
-  console.log(`🚀 AI Interior Planner API running on http://localhost:${PORT}`);
+  console.log(`SmartSpace API running on http://localhost:${PORT}`);
 });
 
 export default app;

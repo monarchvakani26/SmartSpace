@@ -1,112 +1,112 @@
-# AI Interior Planner 🏠✨
+# SmartSpace
 
-> An AI-assisted enterprise platform for **interior design firms and designers** that combines a parametric drag-and-drop 2D/3D room design studio with an end-to-end business workflow: **Lead → Client → Project → Room Design → Customization → Parametric Costing → Quotation PDF → Orders → Inventory → Delivery**.
-
----
-
-## 🌟 Key Features
-
-1. **Split-Screen Authentication**: Secure login with Role-Based Access Control (Admin, Designer, Sales Executive, Estimator).
-2. **Executive Studio Dashboard**: 4 KPI stat cards (Total Leads, Active Projects, Total Orders, Revenue), Recent Projects table, and dynamic Tasks checklist.
-3. **Leads & CRM Pipeline**: Comprehensive client enquiry tracking with status indicators (New, Contacted, Interested, Not Interested).
-4. **Parametric Room Wizard**:
-   - Step 1: Project Metadata & Client assignment
-   - Step 2: Spatial Dimensions (Length, Width, Height in feet) with **Live Isometric 3D Room Outline** and edge measurement badges.
-5. **Interactive 2D Drag-and-Drop Design Studio**:
-   - Canvas drawn to scale with dynamic dimension edge labels.
-   - Categorized furniture palette: Beds, Wardrobes, Sofas, Tables, Doors, Windows, Decor.
-   - Select, Move, 45° Rotate, Delete, Undo/Redo history stack, Zoom controls, and 3D view toggle.
-   - Central canonical layout state synchronizer.
-6. **Detailed Item Customization Studio**:
-   - Material selector (Plywood 18mm, Blockboard, Solid Teak)
-   - Finish / Laminate selector (Sunmica Walnut, Acrylic Gloss, Matte)
-   - Interactive color swatches
-   - Handles & Hardware dropdown
-   - Internal organizer setup & Soft-close dampening toggle switch
-   - Real-time product render preview.
-7. **Parametric Pricing & Costing Engine**:
-   - Auto-computed cost breakdown: Items Total, Material Customization, Labor Charges, Transport, Contingency, Subtotal, GST 18%, and Final Total.
-   - Configurable commercial settings: Profit Margin %, Discount %, Contingency %.
-8. **Client-Ready Quotation Document & Instant PDF**:
-   - Formal quotation card with billing, project specs, and itemized breakdown.
-   - Instant client PDF download via `jsPDF`.
-   - "Send to Client" dispatch.
-9. **Orders & Inventory Management**: Live stock levels, sheet counts, and order tracking.
-10. **Reports & Financial Analytics**: Recharts weekly revenue area chart and project status donut chart.
-11. **Defensible AI/ML Service (FastAPI)**:
-    - Constraint/Rules-Based Recommendation Engine
-    - XGBoost Cost Prediction Regressor
-    - Heuristic Collision & Clearance Layout Optimizer
+> **Constraint-based parametric interior studio** with optional firm desk (CRM) and an explainable assist service.  
+> Thesis framing: spatial layout analysis + greedy optimization + parametric costing — **not** black-box room reconstruction.
 
 ---
 
-## 🏗️ Architecture & Tech Stack
+## What this is
 
-- **Frontend**: React 18, TypeScript, Vite, Tailwind CSS, Zustand, Recharts, jsPDF, Lucide Icons, React Hot Toast
-- **Backend**: Node.js, Express, TypeScript, Prisma ORM, JWT, RBAC
-- **AI Service**: Python 3.11, FastAPI, Pydantic, Scikit-learn
-- **Database**: PostgreSQL (Prisma) / Seamless Persistent In-Memory Fallback
-- **Infra**: Docker & Docker Compose
+SmartSpace helps interior designers:
+
+1. Define a room and place furniture on a **scaled 2D plan** (synced **3D** view)
+2. See **collisions, door clearance, walkability score**
+3. Use **rules / heuristics** to furnish or untangle layouts (methods labeled in UI)
+4. Customize materials → **parametric cost** → **quotation PDF**
+
+Photo upload initializes an **approximate editable plan** from a drawn scale reference — it does **not** claim exact 3D reconstruction.
 
 ---
 
-## 🚀 Quick Start (Running Locally)
+## What this is not
 
-### Option 1: Quick Run Frontend (Instant UI Demo)
+- Not BIM / structural CAD  
+- Not trained computer vision depth/segmentation (unless you plug models in)  
+- Not “just a CRM” — desk pages support the studio; demo from **Your spaces → Design studio**
+
+---
+
+## Stack
+
+| Layer | Tech | Port |
+|-------|------|------|
+| Frontend | React, Vite, TypeScript, Zustand, R3F/Three | 5173 |
+| Backend | Express, Prisma, JWT | 4000 |
+| Assist | FastAPI (rules + heuristics + optional cost `.pkl`) | 8000 |
+| DB | PostgreSQL (optional; frontend has mock fallback) | 5432 |
+
+---
+
+## Quick start
 
 ```bash
-cd frontend
-npm run dev
-```
-Open **`http://localhost:5173`** in your browser!
+# Frontend (UI + local heuristics work alone)
+cd frontend && npm install && npm run dev
 
-### Option 2: Run Backend & AI Service
+# Backend (optional persistence)
+cd backend && npm install && npx prisma generate && npm run dev
 
-```bash
-# Start Backend
-cd backend
-npm run dev
-
-# Start AI Service (in another terminal)
-cd ai-service
-pip install -r requirements.txt
+# Assist service (optional)
+cd ai-service && pip install -r requirements.txt
 uvicorn main:app --reload --port 8000
 ```
 
-### Option 3: Full Stack with Docker Compose
+**Login:** `admin@aiinteriorplanner.com` / `admin123` (or mock login if API is down)
+
+---
+
+## Cost model (optional, for FYP honesty)
 
 ```bash
-docker-compose up --build
+cd ai-service
+python models/generate_synthetic_costs.py
+python models/train_cost_model.py models/approved-project-costs.csv
+```
+
+This writes `models/cost_prediction.pkl`. Until that file exists, `/predict-cost` returns an **honest heuristic fallback** and the UI labels the method.
+
+---
+
+## Evaluation (FYP evidence)
+
+Open **Evidence → Evaluation** in the app, or see `docs/EVALUATION.md`.  
+In-browser suite runs 12 synthetic rooms through `analyzeLayout` + `localOptimize` and reports collision/score deltas — not mocked charts.
+
+---
+
+## Assist methods (UI badges)
+
+| Action | Method label |
+|--------|----------------|
+| Furnish | `rules` |
+| Suggest layout | `heuristic-optimizer` |
+| Cost whisper | `trained model` or `local formula` |
+| Photo → plan | `approximate-photo` |
+
+---
+
+## Project layout
+
+```
+SmartSpace/
+├── frontend/          # Studio UI
+├── backend/           # REST + Prisma costing
+├── ai-service/        # Explainable assist API
+├── docs/EVALUATION.md
+└── docker-compose.yml
 ```
 
 ---
 
-## 🔑 Default Credentials
+## Default credentials
 
 | Role | Email | Password |
-| :--- | :--- | :--- |
-| **Admin** | `admin@aiinteriorplanner.com` | `admin123` |
-| **Designer** | `designer@aiinteriorplanner.com` | `designer123` |
-| **Sales Exec** | `sales@aiinteriorplanner.com` | `sales123` |
-| **Estimator** | `estimator@aiinteriorplanner.com` | `estimator123` |
+|------|-------|----------|
+| Admin | admin@aiinteriorplanner.com | admin123 |
+| Designer | designer@aiinteriorplanner.com | designer123 |
 
 ---
 
-## 📂 Project Structure
+## Academic one-liner
 
-```
-ai-interior-planner/
-├── frontend/             # React 18 + Vite + Tailwind CSS app
-│   ├── src/
-│   │   ├── components/   # Sidebar, AppLayout, etc.
-│   │   ├── pages/        # All 12 Reference Portal Screens
-│   │   ├── services/     # API Client & Mock DB
-│   │   ├── stores/       # Zustand Auth & Layout Stores
-│   │   └── types/        # TypeScript Interfaces
-├── backend/              # Express + TypeScript + Prisma API
-│   ├── prisma/           # schema.prisma & seed.ts (20+ tables)
-│   └── src/              # Routes, Middleware, Costing Service
-├── ai-service/           # FastAPI AI/ML service
-│   └── main:app          # Recommendation, Cost Prediction, Layout Optimizer
-└── docker-compose.yml    # Full stack container configuration
-```
+> SmartSpace is a parametric interior studio with constraint-based spatial analysis and costing; assist features are explainable heuristics (and an optional cost regressor), not CV reconstruction.

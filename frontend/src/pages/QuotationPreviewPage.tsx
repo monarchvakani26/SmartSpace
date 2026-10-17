@@ -1,23 +1,30 @@
-import React, { useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Download, Send, ArrowLeft } from 'lucide-react';
 import { useLayoutStore } from '../stores/useLayoutStore';
 import { apiService } from '../services/api';
+import { Project } from '../types';
 import jsPDF from 'jspdf';
 import toast from 'react-hot-toast';
 
 export const QuotationPreviewPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { items, roomName, pricingSettings } = useLayoutStore();
+  const { items, roomName, pricingSettings, projectId } = useLayoutStore();
   const quotationRef = useRef<HTMLDivElement>(null);
+  const [project, setProject] = useState<Project | null>(null);
 
   const costBreakdown = apiService.calculateCost(items, pricingSettings);
-  const quoteNumber = `HQTH-2024-0012`;
-  const quoteDate = `20 May 2024`;
-  const clientName = `Rohan Mehta`;
-  const clientLocation = `Mumbai, Maharashtra`;
-  const clientContact = `9876543210`;
+  const projectKey = id || projectId || 'proj-1';
+  const quoteNumber = `SS-${projectKey.slice(-4).toUpperCase()}-${new Date().getFullYear()}`;
+  const quoteDate = new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+  const clientName = project?.client?.name || 'Client pending';
+  const clientLocation = project?.client?.city || project?.client?.address || '—';
+  const clientContact = project?.client?.phone || '—';
+
+  useEffect(() => {
+    apiService.getProjectById(projectKey).then(setProject).catch(() => setProject(null));
+  }, [projectKey]);
 
   // Real jsPDF document generation
   const handleDownloadPDF = () => {
@@ -139,7 +146,13 @@ export const QuotationPreviewPage: React.FC = () => {
   };
 
   const handleSendClient = () => {
-    toast.success(`Quotation sent to client at ${clientContact}!`);
+    if (!project?.client?.phone && !project?.client?.email) {
+      toast.error('No client contact on this project — assign a client first');
+      return;
+    }
+    toast.success(
+      `Dispatch queued for ${clientName}${project.client?.email ? ` (${project.client.email})` : ` · ${clientContact}`} — email provider not configured (demo).`
+    );
   };
 
   return (
@@ -148,7 +161,10 @@ export const QuotationPreviewPage: React.FC = () => {
         <div>
           <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-ink-muted mb-2">Document</p>
           <h1 className="font-display text-4xl text-ink tracking-tight">Quotation</h1>
-          <p className="text-sm text-ink-muted mt-2">Client-ready sheet from the studio layout.</p>
+          <p className="text-sm text-ink-muted mt-2">
+            From live layout · client-side parametric calc
+            {project?.client ? ` · ${project.client.name}` : ' · load project for client details'}
+          </p>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
@@ -187,7 +203,7 @@ export const QuotationPreviewPage: React.FC = () => {
           <div className="sm:text-right">
             <span className="font-bold text-ink-muted uppercase tracking-[0.12em] block mb-1">Project</span>
             <p className="font-semibold text-sm text-ink">{roomName || 'Modern Bedroom'}</p>
-            <p className="text-ink-muted mt-0.5">PRJ-2024-08</p>
+            <p className="text-ink-muted mt-0.5">{projectKey}</p>
           </div>
         </div>
 

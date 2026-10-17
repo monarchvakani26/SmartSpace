@@ -123,11 +123,19 @@ async def scene_analysis(
 
 @app.get("/health")
 def health_check():
+    model_loaded = load_cost_model() is not None
     return {
         "status": "healthy",
-        "service": "AI Interior Planner ML Service",
-        "version": "1.0.0",
-        "engines": ["Constraint-Based Recommendation", "Heuristic Layout Optimizer", "XGBoost Cost Regressor"]
+        "service": "SmartSpace assist service",
+        "version": "1.1.0",
+        "framing": "Constraint-based spatial assist + optional cost regressor — not CV reconstruction",
+        "engines": {
+            "recommend": "rules",
+            "optimize_layout": "heuristic-aabb",
+            "predict_cost": "trained-pkl" if model_loaded else "heuristic-fallback",
+            "scene_analysis": "approximate-photo-scale",
+        },
+        "cost_model_loaded": model_loaded,
     }
 
 @app.post("/recommend")
@@ -142,16 +150,18 @@ def recommend_furniture_materials(req: RecommendationRequest):
         "recommended_palette": {
             "primary": "#5C4033" if req.style_preference == "CLASSIC" else "#0F1629",
             "secondary": "#E2D4C3",
-            "accent": "#5B4FE0",
+            "accent": "#A67C52",
             "materials": ["Plywood 18mm", "Sunmica Walnut", "Matte Laminate"]
         },
         "suggested_items": [
-            {"category": "Beds", "name": "King Size Bed with Storage", "reason": "Optimizes room volume with hydraulic base"},
-            {"category": "Wardrobes", "name": "3 Door Wardrobe", "reason": "Fits back wall boundary perfectly with 2ft clearance"},
-            {"category": "Tables", "name": "Bed Side Tables (Pair)", "reason": "Balanced flanking arrangement"},
-            {"category": "Tables", "name": "TV Unit with Storage", "reason": "Provides clean media sightline"}
+            {"category": "Beds", "name": "King Size Bed", "reason": "Anchors the long wall; leave walk aisle"},
+            {"category": "Wardrobes", "name": "3 Door Wardrobe", "reason": "Back-wall storage with clearance"},
+            {"category": "Tables", "name": "Bed Side Table", "reason": "Flanking nightstand"},
+            {"category": "Tables", "name": "TV Unit with Storage", "reason": "Opposite media wall"},
+            {"category": "Doors", "name": "Standard Door", "reason": "Entry opening"}
         ],
-        "confidence_score": 0.94
+        "confidence_score": 0.86,
+        "method": "rules"
     }
     return recommendations
 

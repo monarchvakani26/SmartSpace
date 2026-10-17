@@ -1,5 +1,18 @@
 # Cost-prediction model
 
-`train_cost_model.py` trains and persists `cost_prediction.pkl`. It expects a CSV with the columns `room_area`, `furniture_count`, `material_type`, `labor_cost`, `location`, `project_type`, and `total_cost`.
+## Train
 
-Run `python models/train_cost_model.py path/to/approved-project-costs.csv`. The API deliberately returns `model_not_configured` until this artefact exists; it never substitutes a formula or claims an accuracy that has not been measured.
+```bash
+# From ai-service/
+python models/generate_synthetic_costs.py
+python models/train_cost_model.py models/approved-project-costs.csv
+```
+
+Writes `cost_prediction.pkl` with the lowest-MAE candidate among Linear Regression, Random Forest, and XGBoost.
+
+## Runtime honesty
+
+- If `cost_prediction.pkl` **exists**, `/predict-cost` uses it and reports `model_name` + metrics.
+- If **missing**, `/predict-cost` returns `model_used: heuristic-fallback` (transparent formula). The UI must not claim XGBoost until the artefact is present.
+
+Replace the synthetic CSV with approved historical projects for a stronger FYP claim.
