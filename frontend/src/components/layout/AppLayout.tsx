@@ -1,13 +1,25 @@
 import React from 'react';
-import { Outlet } from 'react-router-dom';
+import { Outlet, useLocation } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 
 export const AppLayout: React.FC = () => {
+  const location = useLocation();
+  const isStudio =
+    location.pathname.includes('/design') ||
+    location.pathname.includes('/customize') ||
+    location.pathname.includes('/pricing');
+
   return (
-    <div className="min-h-screen bg-[#F5F6FA] flex">
+    <div className="min-h-screen flex page-atmosphere">
       <Sidebar />
-      <main className="flex-1 ml-[220px] min-w-0 flex flex-col min-h-screen">
-        <div className="flex-1 p-6 md:p-8 max-w-[1600px] w-full mx-auto">
+      <main className={`flex-1 ml-[200px] min-w-0 flex flex-col min-h-screen ${isStudio ? '' : ''}`}>
+        <div
+          className={
+            isStudio
+              ? 'flex-1 p-3 md:p-4 w-full'
+              : 'flex-1 p-6 md:p-10 max-w-[1400px] w-full mx-auto'
+          }
+        >
           <Outlet />
         </div>
       </main>

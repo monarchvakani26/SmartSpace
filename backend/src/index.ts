@@ -42,6 +42,8 @@ app.use('/api/leads', authMiddleware, leadsRouter);
 app.use('/api/clients', authMiddleware, clientsRouter);
 app.use('/api/projects', authMiddleware, projectsRouter);
 app.use('/api/rooms', authMiddleware, roomsRouter);
+// Compatibility surface for the layout studio: these handlers operate on RoomLayout IDs.
+app.use('/api/layouts', authMiddleware, roomsRouter);
 app.use('/api/furniture', authMiddleware, furnitureRouter);
 app.use('/api/quotations', authMiddleware, quotationsRouter);
 app.use('/api/orders', authMiddleware, ordersRouter);

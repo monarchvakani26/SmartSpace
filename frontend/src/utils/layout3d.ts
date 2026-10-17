@@ -29,35 +29,57 @@ export function footprint(item: LayoutItem) {
   return { left: x - w / 2, right: x + w / 2, top: y - d / 2, bottom: y + d / 2 };
 }
 export function checkCollision(a: LayoutItem, b: LayoutItem) { const A = footprint(a), B = footprint(b); return A.left < B.right && A.right > B.left && A.top < B.bottom && A.bottom > B.top; }
-export function collisionIds(items: LayoutItem[]) { const invalid = new Set<string>(); for (let i = 0; i < items.length; i++) for (let j = i + 1; j < items.length; j++) if (checkCollision(items[i], items[j])) { invalid.add(items[i].id); invalid.add(items[j].id); } return invalid; }
+export function collisionIds(items: LayoutItem[]) { const invalid = new Set<string>(); const furniture = items.filter(item => !/door|window/.test(`${item.category || ''} ${item.name}`.toLowerCase())); for (let i = 0; i < furniture.length; i++) for (let j = i + 1; j < furniture.length; j++) if (checkCollision(furniture[i], furniture[j])) { invalid.add(furniture[i].id); invalid.add(furniture[j].id); } return invalid; }
+
+const isOpening = (item: LayoutItem) => /door|window/.test(`${item.category || ''} ${item.name}`.toLowerCase());
+const isDoor = (item: LayoutItem) => /door/.test(`${item.category || ''} ${item.name}`.toLowerCase());
+const intersects = (a: ReturnType<typeof footprint>, b: ReturnType<typeof footprint>) => a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top;
+
+/** Keeps doors/windows as room fixtures, rather than treating them as furniture collisions. */
+export function furnitureItems(items: LayoutItem[]) { return items.filter(item => !isOpening(item)); }
+export function doorClearanceViolations(items: LayoutItem[]) {
+  const doors = items.filter(isDoor), furniture = furnitureItems(items);
+  const blocked: Array<{ door: LayoutItem; item: LayoutItem }> = [];
+  for (const door of doors) for (const item of furniture) {
+    const doorBox = footprint(door);
+    // A one-foot expansion represents the swing / approach zone for the plan-level door symbol.
+    const clearance = { left: doorBox.left - 1, right: doorBox.right + 1, top: doorBox.top - 1, bottom: doorBox.bottom + 1 };
+    if (intersects(clearance, footprint(item))) blocked.push({ door, item });
+  }
+  return blocked;
+}
 
 export interface DesignAnalysis {
   roomAreaSqFt: number; occupiedAreaSqFt: number; freeAreaSqFt: number;
   utilizationPercent: number; walkablePercent: number; collisionPairs: Array<[LayoutItem, LayoutItem]>;
-  boundaryItemIds: string[]; recommendation: string;
+  boundaryItemIds: string[]; doorObstructions: Array<{ door: LayoutItem; item: LayoutItem }>; score: number; recommendation: string;
 }
 
 /** A 1 ft grid is intentionally conservative and derived entirely from the live layout. */
 export function analyzeLayout(items: LayoutItem[], lengthFt: number, widthFt: number): DesignAnalysis {
+  const furniture = furnitureItems(items);
   const roomAreaSqFt = lengthFt * widthFt;
   const collisionPairs: Array<[LayoutItem, LayoutItem]> = [];
   const boundaryItemIds = items.filter(item => {
     const box = footprint(item);
     return box.left < 0 || box.top < 0 || box.right > lengthFt || box.bottom > widthFt;
   }).map(item => item.id);
-  for (let i = 0; i < items.length; i++) for (let j = i + 1; j < items.length; j++) if (checkCollision(items[i], items[j])) collisionPairs.push([items[i], items[j]]);
-  const occupiedAreaSqFt = items.reduce((sum, item) => sum + item.widthFt * item.heightFt, 0);
+  for (let i = 0; i < furniture.length; i++) for (let j = i + 1; j < furniture.length; j++) if (checkCollision(furniture[i], furniture[j])) collisionPairs.push([furniture[i], furniture[j]]);
+  const occupiedAreaSqFt = furniture.reduce((sum, item) => sum + item.widthFt * item.heightFt, 0);
   let total = 0, blocked = 0;
   for (let x = .5; x < lengthFt; x += 1) for (let y = .5; y < widthFt; y += 1) {
     total++;
-    if (items.some(item => { const box = footprint(item); return x >= box.left && x <= box.right && y >= box.top && y <= box.bottom; })) blocked++;
+    if (furniture.some(item => { const box = footprint(item); return x >= box.left && x <= box.right && y >= box.top && y <= box.bottom; })) blocked++;
   }
   const walkablePercent = total ? ((total - blocked) / total) * 100 : 0;
   const utilizationPercent = roomAreaSqFt ? (occupiedAreaSqFt / roomAreaSqFt) * 100 : 0;
+  const doorObstructions = doorClearanceViolations(items);
+  const score = Math.max(0, Math.min(100, Math.round(100 - collisionPairs.length * 28 - boundaryItemIds.length * 20 - doorObstructions.length * 18 - Math.max(0, 45 - walkablePercent) * .7)));
   const pair = collisionPairs[0];
   const recommendation = pair ? `Move ${pair[1].name} away from ${pair[0].name}; the current footprints overlap.`
     : boundaryItemIds.length ? `Move ${items.find(item => item.id === boundaryItemIds[0])?.name} fully inside the room boundary.`
+    : doorObstructions.length ? `Move ${doorObstructions[0].item.name} away from the ${doorObstructions[0].door.name} clearance zone.`
     : walkablePercent < 45 ? 'Reduce or reposition furniture to restore a clear walking route.'
     : 'Layout is spatially valid. Keep wall-aligned storage to preserve the central walking area.';
-  return { roomAreaSqFt, occupiedAreaSqFt, freeAreaSqFt: Math.max(0, roomAreaSqFt - occupiedAreaSqFt), utilizationPercent, walkablePercent, collisionPairs, boundaryItemIds, recommendation };
+  return { roomAreaSqFt, occupiedAreaSqFt, freeAreaSqFt: Math.max(0, roomAreaSqFt - occupiedAreaSqFt), utilizationPercent, walkablePercent, collisionPairs, boundaryItemIds, doorObstructions, score, recommendation };
 }

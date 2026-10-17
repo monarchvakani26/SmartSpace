@@ -24,10 +24,10 @@ export const App: React.FC = () => {
         toastOptions={{
           duration: 3000,
           style: {
-            background: '#0F1629',
-            color: '#fff',
+            background: '#1F1C19',
+            color: '#F7F6F2',
             fontSize: '13px',
-            borderRadius: '10px',
+            borderRadius: '2px',
           }
         }}
       />
@@ -51,10 +51,6 @@ export const App: React.FC = () => {
           <Route path="/inventory" element={<InventoryPage />} />
           <Route path="/reports" element={<ReportsPage />} />
 
-          {/* Stubs for other menu items */}
-          <Route path="/vendors" element={<OrdersPage />} />
-          <Route path="/tasks" element={<DashboardPage />} />
-          <Route path="/settings" element={<DashboardPage />} />
         </Route>
 
         <Route path="*" element={<Navigate to="/dashboard" replace />} />

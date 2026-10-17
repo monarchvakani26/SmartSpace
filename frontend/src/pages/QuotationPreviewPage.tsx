@@ -1,6 +1,6 @@
 import React, { useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Download, Send, Home, Printer, ArrowLeft, CheckCircle2, FileText, Sparkles } from 'lucide-react';
+import { Download, Send, ArrowLeft } from 'lucide-react';
 import { useLayoutStore } from '../stores/useLayoutStore';
 import { apiService } from '../services/api';
 import jsPDF from 'jspdf';
@@ -34,10 +34,10 @@ export const QuotationPreviewPage: React.FC = () => {
       doc.setTextColor(255, 255, 255);
       doc.setFontSize(18);
       doc.setFont('helvetica', 'bold');
-      doc.text('AI INTERIOR PLANNER', 40, 45);
+      doc.text('SMARTSPACE', 40, 45);
       doc.setFontSize(9);
       doc.setFont('helvetica', 'normal');
-      doc.text('PREMIUM INTERIOR DESIGN & ESTIMATION STUDIO', 40, 60);
+      doc.text('INTERIOR STUDIO & ESTIMATION', 40, 60);
 
       doc.setFontSize(16);
       doc.text('QUOTATION', 450, 45);
@@ -112,7 +112,7 @@ export const QuotationPreviewPage: React.FC = () => {
 
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(12);
-      doc.setTextColor(91, 79, 224);
+      doc.setTextColor(44, 74, 62);
       doc.text('Total Amount:', 380, y);
       doc.text(`₹${costBreakdown.totalAmount.toLocaleString('en-IN')}`, 470, y);
       y += 40;
@@ -143,163 +143,111 @@ export const QuotationPreviewPage: React.FC = () => {
   };
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
-      
-      {/* Action Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <div className="max-w-4xl mx-auto space-y-8 animate-space-rise">
+      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Quotation Preview</h1>
-          <p className="text-xs text-slate-500 mt-0.5">Formal client quotation generated from design specifications.</p>
+          <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-ink-muted mb-2">Document</p>
+          <h1 className="font-display text-4xl text-ink tracking-tight">Quotation</h1>
+          <p className="text-sm text-ink-muted mt-2">Client-ready sheet from the studio layout.</p>
         </div>
 
-        <div className="flex items-center gap-2.5">
-          <button
-            onClick={() => navigate(`/projects/${id || 'proj-1'}/pricing`)}
-            className="btn-outline flex items-center gap-1.5 text-xs py-2"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            <span>Pricing</span>
+        <div className="flex flex-wrap items-center gap-2">
+          <button onClick={() => navigate(`/projects/${id || 'proj-1'}/pricing`)} className="btn-outline flex items-center gap-1.5 text-xs">
+            <ArrowLeft className="w-4 h-4" /> Pricing
           </button>
-
-          <button
-            onClick={handleSendClient}
-            className="btn-outline flex items-center gap-1.5 text-xs py-2 text-primary border-primary/30 hover:bg-primary/5 font-semibold"
-          >
-            <Send className="w-3.5 h-3.5" />
-            <span>Send to Client</span>
+          <button onClick={handleSendClient} className="btn-outline flex items-center gap-1.5 text-xs text-primary border-primary/30">
+            <Send className="w-3.5 h-3.5" /> Send
           </button>
-
-          <button
-            onClick={handleDownloadPDF}
-            className="btn-primary flex items-center gap-1.5 text-xs py-2 shadow-md shadow-primary/25"
-          >
-            <Download className="w-3.5 h-3.5" />
-            <span>Download PDF</span>
+          <button onClick={handleDownloadPDF} className="btn-primary flex items-center gap-1.5 text-xs">
+            <Download className="w-3.5 h-3.5" /> PDF
           </button>
         </div>
       </div>
 
-      {/* Formal Document Card (Reference Screen 9) */}
-      <div ref={quotationRef} className="card !p-8 md:!p-10 space-y-8 bg-white border border-slate-200/90 shadow-xl">
-        
-        {/* Document Header */}
-        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-6 pb-6 border-b border-slate-200">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center text-white shadow-md shadow-primary/20">
-              <Home className="w-5 h-5" />
-            </div>
-            <div>
-              <div className="text-sm font-black tracking-wider text-slate-900 uppercase">
-                AI INTERIOR PLANNER
-              </div>
-              <div className="text-[11px] text-slate-500 font-medium">
-                Design Studio & Estimation Engine
-              </div>
-            </div>
+      <div ref={quotationRef} className="bg-surface-card border border-surface-border p-8 md:p-10 space-y-8 shadow-card-hover">
+        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-6 pb-6 border-b border-surface-border">
+          <div>
+            <p className="font-display text-2xl text-ink">SmartSpace</p>
+            <p className="text-[11px] text-ink-muted font-medium mt-0.5">Interior studio · Estimation</p>
           </div>
-
-          <div className="text-right">
-            <h2 className="text-xl font-black tracking-wider text-slate-900 uppercase">
-              QUOTATION
-            </h2>
+          <div className="sm:text-right">
+            <h2 className="font-display text-2xl text-ink">Quotation</h2>
             <p className="text-xs font-bold text-primary mt-0.5">{quoteNumber}</p>
-            <p className="text-xs text-slate-400 mt-0.5">Date: {quoteDate}</p>
+            <p className="text-xs text-ink-muted mt-0.5">{quoteDate}</p>
           </div>
         </div>
 
-        {/* Bill To & Project Info */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 text-xs">
           <div>
-            <span className="font-bold text-slate-400 uppercase tracking-wider block mb-1">
-              Bill To
-            </span>
-            <p className="font-bold text-sm text-slate-900">{clientName}</p>
-            <p className="text-slate-600 mt-0.5">{clientLocation}</p>
-            <p className="text-slate-500 mt-0.5">Ph: {clientContact}</p>
+            <span className="font-bold text-ink-muted uppercase tracking-[0.12em] block mb-1">Bill to</span>
+            <p className="font-semibold text-sm text-ink">{clientName}</p>
+            <p className="text-ink-muted mt-0.5">{clientLocation}</p>
+            <p className="text-ink-muted mt-0.5">Ph: {clientContact}</p>
           </div>
-
           <div className="sm:text-right">
-            <span className="font-bold text-slate-400 uppercase tracking-wider block mb-1">
-              Project
-            </span>
-            <p className="font-bold text-sm text-slate-900">{roomName || 'Modern Bedroom'}</p>
-            <p className="text-slate-600 mt-0.5">Design ID: PRJ-2024-08</p>
+            <span className="font-bold text-ink-muted uppercase tracking-[0.12em] block mb-1">Project</span>
+            <p className="font-semibold text-sm text-ink">{roomName || 'Modern Bedroom'}</p>
+            <p className="text-ink-muted mt-0.5">PRJ-2024-08</p>
           </div>
         </div>
 
-        {/* Itemized Table */}
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
-              <tr className="border-y border-slate-200 bg-slate-50/70">
-                <th className="py-2.5 px-3 text-xs font-bold text-slate-600 uppercase tracking-wider">Sr. No.</th>
-                <th className="py-2.5 px-3 text-xs font-bold text-slate-600 uppercase tracking-wider">Item</th>
-                <th className="py-2.5 px-3 text-xs font-bold text-slate-600 uppercase tracking-wider">Description</th>
-                <th className="py-2.5 px-3 text-xs font-bold text-slate-600 uppercase tracking-wider text-center">Qty</th>
-                <th className="py-2.5 px-3 text-xs font-bold text-slate-600 uppercase tracking-wider text-right">Rate (₹)</th>
-                <th className="py-2.5 px-3 text-xs font-bold text-slate-600 uppercase tracking-wider text-right">Amount (₹)</th>
+              <tr className="border-y border-surface-border bg-plaster/40">
+                <th className="py-2.5 px-3 text-[11px] font-bold text-ink-muted uppercase tracking-[0.1em]">#</th>
+                <th className="py-2.5 px-3 text-[11px] font-bold text-ink-muted uppercase tracking-[0.1em]">Item</th>
+                <th className="py-2.5 px-3 text-[11px] font-bold text-ink-muted uppercase tracking-[0.1em]">Description</th>
+                <th className="py-2.5 px-3 text-[11px] font-bold text-ink-muted uppercase tracking-[0.1em] text-center">Qty</th>
+                <th className="py-2.5 px-3 text-[11px] font-bold text-ink-muted uppercase tracking-[0.1em] text-right">Rate</th>
+                <th className="py-2.5 px-3 text-[11px] font-bold text-ink-muted uppercase tracking-[0.1em] text-right">Amount</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 text-xs">
+            <tbody className="divide-y divide-surface-border/70 text-xs">
               {costBreakdown.items.map((item, idx) => (
-                <tr key={idx} className="hover:bg-slate-50/50">
-                  <td className="py-3 px-3 text-slate-400 font-semibold">{idx + 1}</td>
-                  <td className="py-3 px-3 font-bold text-slate-900">{item.name}</td>
-                  <td className="py-3 px-3 text-slate-600">{item.description}</td>
-                  <td className="py-3 px-3 text-slate-800 text-center font-semibold">{item.quantity}</td>
-                  <td className="py-3 px-3 text-slate-700 text-right font-medium">
-                    ₹{item.rate.toLocaleString('en-IN')}
-                  </td>
-                  <td className="py-3 px-3 text-slate-900 text-right font-bold">
-                    ₹{item.amount.toLocaleString('en-IN')}
-                  </td>
+                <tr key={idx}>
+                  <td className="py-3 px-3 text-ink-muted font-semibold">{idx + 1}</td>
+                  <td className="py-3 px-3 font-bold text-ink">{item.name}</td>
+                  <td className="py-3 px-3 text-ink-muted">{item.description}</td>
+                  <td className="py-3 px-3 text-center font-semibold">{item.quantity}</td>
+                  <td className="py-3 px-3 text-right">₹{item.rate.toLocaleString('en-IN')}</td>
+                  <td className="py-3 px-3 text-right font-bold">₹{item.amount.toLocaleString('en-IN')}</td>
                 </tr>
               ))}
               <tr>
-                <td className="py-3 px-3 text-slate-400 font-semibold">{costBreakdown.items.length + 1}</td>
-                <td className="py-3 px-3 font-bold text-slate-900">Accessories & Handles</td>
-                <td className="py-3 px-3 text-slate-600">Lights, Handles, Soft Close Dampers</td>
-                <td className="py-3 px-3 text-slate-800 text-center font-semibold">1</td>
-                <td className="py-3 px-3 text-slate-700 text-right font-medium">₹10,000</td>
-                <td className="py-3 px-3 text-slate-900 text-right font-bold">₹10,000</td>
+                <td className="py-3 px-3 text-ink-muted font-semibold">{costBreakdown.items.length + 1}</td>
+                <td className="py-3 px-3 font-bold text-ink">Accessories & handles</td>
+                <td className="py-3 px-3 text-ink-muted">Hardware, soft-close, fittings</td>
+                <td className="py-3 px-3 text-center font-semibold">1</td>
+                <td className="py-3 px-3 text-right">₹10,000</td>
+                <td className="py-3 px-3 text-right font-bold">₹10,000</td>
               </tr>
             </tbody>
           </table>
         </div>
 
-        {/* Totals Block (Bottom Right) */}
-        <div className="flex flex-col sm:flex-row justify-between items-start pt-4 border-t border-slate-200 gap-6">
-          {/* Terms & Conditions */}
-          <div className="max-w-md text-xs text-slate-500 space-y-1.5">
-            <p className="font-bold text-slate-800 uppercase tracking-wider">Terms & Conditions</p>
-            <p>1. This quotation is valid for 30 days from date of issue.</p>
-            <p>2. 50% advance payment required to initiate manufacturing.</p>
-            <p>3. Balance payable upon delivery and installation completion.</p>
+        <div className="flex flex-col sm:flex-row justify-between items-start pt-4 border-t border-surface-border gap-6">
+          <div className="max-w-md text-xs text-ink-muted space-y-1.5">
+            <p className="font-bold text-ink uppercase tracking-[0.12em]">Terms</p>
+            <p>1. Valid for 30 days from issue.</p>
+            <p>2. 50% advance to start manufacturing.</p>
+            <p>3. Balance on delivery and installation.</p>
           </div>
-
-          {/* Subtotal, GST, Total */}
           <div className="w-full sm:w-64 space-y-2 text-xs">
-            <div className="flex justify-between py-1 text-slate-600">
-              <span>Sub Total</span>
-              <span className="font-semibold text-slate-900">
-                ₹{costBreakdown.subTotal.toLocaleString('en-IN')}
-              </span>
+            <div className="flex justify-between py-1 text-ink-muted">
+              <span>Subtotal</span>
+              <span className="font-semibold text-ink">₹{costBreakdown.subTotal.toLocaleString('en-IN')}</span>
             </div>
-            <div className="flex justify-between py-1 text-slate-600">
+            <div className="flex justify-between py-1 text-ink-muted">
               <span>GST ({costBreakdown.gstPercent}%)</span>
-              <span className="font-semibold text-slate-900">
-                ₹{costBreakdown.gstAmount.toLocaleString('en-IN')}
-              </span>
+              <span className="font-semibold text-ink">₹{costBreakdown.gstAmount.toLocaleString('en-IN')}</span>
             </div>
-            <div className="flex justify-between py-2 border-t border-slate-200 text-sm font-black text-primary">
+            <div className="flex justify-between py-2 border-t border-surface-border font-display text-xl text-primary">
               <span>Total</span>
-              <span className="text-base">
-                ₹{costBreakdown.totalAmount.toLocaleString('en-IN')}
-              </span>
+              <span>₹{costBreakdown.totalAmount.toLocaleString('en-IN')}</span>
             </div>
           </div>
         </div>
-
       </div>
     </div>
   );

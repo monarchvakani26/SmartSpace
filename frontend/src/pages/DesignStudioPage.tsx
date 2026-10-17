@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { useNavigate, useParams, Link } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { 
   MousePointer, 
   Move, 
@@ -17,22 +17,20 @@ import {
   Armchair, 
   Table, 
   Grid, 
-  Maximize2, 
   Square, 
   DoorClosed, 
   Flower2, 
-  MoreHorizontal,
-  ChevronDown,
   Box,
-  Eye,
   Settings2
 } from 'lucide-react';
 import { useLayoutStore } from '../stores/useLayoutStore';
 import { apiService } from '../services/api';
+import { aiService } from '../services/aiService';
 import { FurnitureCatalogItem, FurnitureCategory, LayoutItem } from '../types';
 import toast from 'react-hot-toast';
 import { Scene3D } from '../components/studio/Scene3D';
 import { PhotoReconstructionPanel } from '../components/studio/PhotoReconstructionPanel';
+import { StudioAICoach } from '../components/studio/StudioAICoach';
 import { analyzeLayout, clampAndSnap, collisionIds } from '../utils/layout3d';
 
 export const DesignStudioPage: React.FC = () => {
@@ -42,12 +40,16 @@ export const DesignStudioPage: React.FC = () => {
   const { 
     lengthFt, 
     widthFt, 
-    heightFt, 
+    heightFt,
+    roomType,
     items, 
     selectedItemId, 
     activeTool, 
     zoomLevel,
     is3DView,
+    photoBackdropUrl,
+    photoBackdropOpacity,
+    isLayoutAnimating,
     addItem, 
     updateItem, 
     removeItem, 
@@ -56,7 +58,11 @@ export const DesignStudioPage: React.FC = () => {
     setZoomLevel,
     toggle3DView,
     undo, 
-    redo 
+    redo,
+    replaceItems,
+    setItemsPositions,
+    setRoomDimensions,
+    setPhotoBackdrop,
   } = useLayoutStore();
 
   const [categories, setCategories] = useState<FurnitureCategory[]>([]);
@@ -64,6 +70,10 @@ export const DesignStudioPage: React.FC = () => {
   const [catalogItems, setCatalogItems] = useState<FurnitureCatalogItem[]>([]);
   const [isDraggingOver, setIsDraggingOver] = useState(false);
   const [isPhotoWorkflowOpen, setIsPhotoWorkflowOpen] = useState(false);
+  const [rightTab, setRightTab] = useState<'coach' | 'props'>('coach');
+  const [predictedCost, setPredictedCost] = useState<number | null>(null);
+  const [costRange, setCostRange] = useState<{ min: number; max: number } | null>(null);
+  const [costSource, setCostSource] = useState<'ai' | 'local' | null>(null);
 
   const canvasContainerRef = useRef<HTMLDivElement>(null);
   const selectedItem = items.find((i) => i.id === selectedItemId);
@@ -84,11 +94,45 @@ export const DesignStudioPage: React.FC = () => {
       toast.success('Layout saved');
     } catch { toast.error('Could not save layout. Check that this room exists on the server.'); }
   };
+  const applySuggestion = () => {
+    const target = analysis.collisionPairs[0]?.[1] || analysis.doorObstructions[0]?.item;
+    if (!target) { toast.success('No placement correction is needed'); return; }
+    const position = clampAndSnap(target, lengthFt - target.widthFt, widthFt - target.heightFt, lengthFt, widthFt);
+    updateItem(target.id, position);
+    selectItem(target.id);
+    toast.success(`Applied placement suggestion to ${target.name}`);
+  };
 
   useEffect(() => {
     apiService.getFurnitureCategories().then(setCategories);
     apiService.getFurnitureItems().then(setCatalogItems);
   }, []);
+
+  // Live cost whisper — debounced as pieces change
+  useEffect(() => {
+    let cancelled = false;
+    const timer = setTimeout(async () => {
+      const result = await aiService.predictCost({
+        room_type: roomType || 'BEDROOM',
+        length_ft: lengthFt,
+        width_ft: widthFt,
+        height_ft: heightFt,
+        item_count: Math.max(1, items.length),
+      });
+      if (cancelled) return;
+      setPredictedCost(result.predicted_cost_inr);
+      setCostRange(result.predicted_range);
+      setCostSource(result.source);
+    }, 450);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [items.length, lengthFt, widthFt, heightFt, roomType, items.map((i) => i.id).join(',')]);
+
+  useEffect(() => {
+    if (selectedItemId) setRightTab('props');
+  }, [selectedItemId]);
 
   // Filter items by category
   const filteredCatalog = activeCategory === 'cat-all'
@@ -208,18 +252,17 @@ export const DesignStudioPage: React.FC = () => {
   const pxScale = 36 * zoomLevel;
 
   return (
-    <div className="space-y-4 select-none" onMouseMove={handleCanvasMouseMove} onMouseUp={handleCanvasMouseUp}>
+    <div className="space-y-3 select-none animate-space-fade" onMouseMove={handleCanvasMouseMove} onMouseUp={handleCanvasMouseUp}>
       
-      {/* Top Studio Bar & Toolbar (Reference Screen 6) */}
-      <div className="card !p-3 flex flex-wrap items-center justify-between gap-3 bg-white">
+      {/* Top Studio Bar */}
+      <div className="panel-quiet !p-2.5 flex flex-wrap items-center justify-between gap-3">
         
-        {/* Left Toolbar Action Icons */}
-        <div className="flex items-center gap-1 sm:gap-2">
+        <div className="flex items-center gap-1 sm:gap-1.5">
           <button
             onClick={() => setActiveTool('select')}
             title="Select tool"
-            className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all ${
-              activeTool === 'select' ? 'bg-primary text-white shadow-sm' : 'hover:bg-slate-100 text-slate-600'
+            className={`px-3 py-1.5 text-xs font-semibold flex items-center gap-1.5 transition-all ${
+              activeTool === 'select' ? 'bg-primary text-[#F7F6F2]' : 'hover:bg-plaster/80 text-ink-muted'
             }`}
           >
             <MousePointer className="w-3.5 h-3.5" />
@@ -229,8 +272,8 @@ export const DesignStudioPage: React.FC = () => {
           <button
             onClick={() => setActiveTool('move')}
             title="Move tool"
-            className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all ${
-              activeTool === 'move' ? 'bg-primary text-white shadow-sm' : 'hover:bg-slate-100 text-slate-600'
+            className={`px-3 py-1.5 text-xs font-semibold flex items-center gap-1.5 transition-all ${
+              activeTool === 'move' ? 'bg-primary text-[#F7F6F2]' : 'hover:bg-plaster/80 text-ink-muted'
             }`}
           >
             <Move className="w-3.5 h-3.5" />
@@ -247,8 +290,8 @@ export const DesignStudioPage: React.FC = () => {
               }
             }}
             title="Rotate selected"
-            className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all ${
-              activeTool === 'rotate' ? 'bg-primary text-white shadow-sm' : 'hover:bg-slate-100 text-slate-600'
+            className={`px-3 py-1.5 text-xs font-semibold flex items-center gap-1.5 transition-all ${
+              activeTool === 'rotate' ? 'bg-primary text-[#F7F6F2]' : 'hover:bg-plaster/80 text-ink-muted'
             }`}
           >
             <RotateCw className="w-3.5 h-3.5" />
@@ -265,8 +308,8 @@ export const DesignStudioPage: React.FC = () => {
               }
             }}
             title="Delete item"
-            className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all ${
-              activeTool === 'delete' ? 'bg-rose-600 text-white shadow-sm' : 'hover:bg-rose-50 text-rose-600'
+            className={`px-3 py-1.5 text-xs font-semibold flex items-center gap-1.5 transition-all ${
+              activeTool === 'delete' ? 'bg-[#9B3B2E] text-white' : 'hover:bg-[#9B3B2E]/10 text-[#9B3B2E]'
             }`}
           >
             <Trash2 className="w-3.5 h-3.5" />
@@ -281,15 +324,15 @@ export const DesignStudioPage: React.FC = () => {
               toast.success(`${selectedItem.name} duplicated`);
             }}
             title="Duplicate selected item"
-            className="px-2 py-1.5 rounded-lg hover:bg-slate-100 text-slate-600 text-xs font-semibold"
+            className="px-2 py-1.5 hover:bg-plaster/80 text-ink-muted text-xs font-semibold"
           >Duplicate</button>
 
-          <div className="h-5 w-px bg-slate-200 mx-1" />
+          <div className="h-5 w-px bg-surface-border mx-1" />
 
           <button
             onClick={undo}
             title="Undo"
-            className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-600 text-xs font-medium flex items-center gap-1"
+            className="p-1.5 hover:bg-plaster/80 text-ink-muted text-xs font-medium flex items-center gap-1"
           >
             <Undo2 className="w-4 h-4" />
             <span className="hidden sm:inline">Undo</span>
@@ -298,18 +341,18 @@ export const DesignStudioPage: React.FC = () => {
           <button
             onClick={redo}
             title="Redo"
-            className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-600 text-xs font-medium flex items-center gap-1"
+            className="p-1.5 hover:bg-plaster/80 text-ink-muted text-xs font-medium flex items-center gap-1"
           >
             <Redo2 className="w-4 h-4" />
             <span className="hidden sm:inline">Redo</span>
           </button>
 
-          <div className="h-5 w-px bg-slate-200 mx-1" />
+          <div className="h-5 w-px bg-surface-border mx-1" />
 
           <button
             onClick={() => setZoomLevel(zoomLevel + 0.15)}
             title="Zoom In"
-            className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-600"
+            className="p-1.5 hover:bg-plaster/80 text-ink-muted"
           >
             <ZoomIn className="w-4 h-4" />
           </button>
@@ -317,60 +360,56 @@ export const DesignStudioPage: React.FC = () => {
           <button
             onClick={() => setZoomLevel(zoomLevel - 0.15)}
             title="Zoom Out"
-            className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-600"
+            className="p-1.5 hover:bg-plaster/80 text-ink-muted"
           >
             <ZoomOut className="w-4 h-4" />
           </button>
         </div>
 
-        {/* Right Action: 3D View & Proceed to Pricing */}
-        <div className="flex items-center gap-2.5">
-          <button onClick={saveLayout} className="px-3.5 py-1.5 rounded-lg text-xs font-semibold border border-emerald-200 text-emerald-700 hover:bg-emerald-50">Save Layout</button>
-          <button onClick={() => setIsPhotoWorkflowOpen(true)} className="px-3.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 border border-primary/25 text-primary hover:bg-indigo-50">
+        <div className="flex items-center gap-2">
+          <button onClick={saveLayout} className="px-3.5 py-1.5 text-xs font-semibold border border-primary/30 text-primary hover:bg-primary-50">Save</button>
+          <button onClick={() => setIsPhotoWorkflowOpen(true)} className="px-3.5 py-1.5 text-xs font-semibold flex items-center gap-1.5 border border-brass/40 text-brass hover:bg-brass-soft/40">
             <Sparkles className="w-3.5 h-3.5" /><span>Photo → 3D</span>
           </button>
           <button
             onClick={toggle3DView}
-            className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all ${
+            className={`px-3.5 py-1.5 text-xs font-semibold flex items-center gap-1.5 transition-all ${
               is3DView 
-                ? 'bg-purple-600 text-white shadow-md shadow-purple-500/30' 
-                : 'bg-primary text-white shadow-md shadow-primary/25 hover:bg-primary-600'
+                ? 'bg-brass text-[#F7F6F2]' 
+                : 'bg-primary text-[#F7F6F2] hover:bg-primary-600'
             }`}
           >
             <Box className="w-3.5 h-3.5" />
-            <span>{is3DView ? '2D Floor Plan' : '3D View'}</span>
+            <span>{is3DView ? '2D plan' : '3D view'}</span>
           </button>
 
           <button
             onClick={() => navigate(`/projects/${id || 'proj-1'}/pricing`)}
-            className="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-lg shadow-sm flex items-center gap-1.5"
+            className="btn-primary !py-1.5 text-xs flex items-center gap-1.5"
           >
-            <span>Proceed to Pricing</span>
+            <span>Pricing</span>
             <ArrowRight className="w-3.5 h-3.5" />
           </button>
         </div>
       </div>
 
-      {/* Main 3-Column Studio Grid: Palette (Left) + Canvas (Center) + Properties (Right) */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start min-h-[620px]">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 items-start min-h-[calc(100vh-8rem)]">
         
-        {/* Left Panel: Furniture Palette (Reference Screen 6 Left) */}
-        <div className="lg:col-span-3 card !p-0 overflow-hidden flex flex-col h-[620px]">
-          <div className="p-3.5 border-b border-slate-100 bg-slate-50/60">
-            <h2 className="text-xs font-bold text-slate-800 uppercase tracking-wider">Add Items</h2>
-            <p className="text-[11px] text-slate-400">Drag or click to place in layout</p>
+        <div className="lg:col-span-3 panel-quiet !p-0 overflow-hidden flex flex-col h-[calc(100vh-8rem)] min-h-[560px]">
+          <div className="p-3.5 border-b border-surface-border">
+            <h2 className="font-display text-lg text-ink">Furniture</h2>
+            <p className="text-[11px] text-ink-muted">Drag onto the floor plan</p>
           </div>
 
-          {/* Category Tabs */}
-          <div className="p-2 border-b border-slate-100 bg-white flex flex-wrap gap-1 max-h-32 overflow-y-auto">
+          <div className="p-2 border-b border-surface-border flex flex-wrap gap-1 max-h-32 overflow-y-auto">
             {categories.map((cat) => (
               <button
                 key={cat.id}
                 onClick={() => setActiveCategory(cat.id)}
-                className={`px-2.5 py-1 rounded-md text-[11px] font-semibold flex items-center gap-1 transition-all ${
+                className={`px-2.5 py-1 text-[11px] font-semibold flex items-center gap-1 transition-all ${
                   activeCategory === cat.id
-                    ? 'bg-primary text-white'
-                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                    ? 'bg-primary text-[#F7F6F2]'
+                    : 'bg-plaster/70 text-ink-muted hover:bg-plaster'
                 }`}
               >
                 {getCategoryIcon(cat.name)}
@@ -379,24 +418,23 @@ export const DesignStudioPage: React.FC = () => {
             ))}
           </div>
 
-          {/* Catalog Items Grid */}
-          <div className="p-3 overflow-y-auto flex-1 grid grid-cols-2 gap-2.5">
+          <div className="p-3 overflow-y-auto flex-1 grid grid-cols-2 gap-2">
             {filteredCatalog.map((item) => (
               <div
                 key={item.id}
                 draggable
                 onDragStart={(e) => handleDragStart(e, item)}
                 onClick={() => handleAddDirect(item)}
-                className="p-2.5 bg-slate-50 hover:bg-white rounded-xl border border-slate-200/80 hover:border-primary hover:shadow-card transition-all cursor-grab active:cursor-grabbing flex flex-col items-center text-center group"
+                className="p-2.5 bg-surface-card/80 hover:bg-surface-card border border-surface-border hover:border-primary transition-all cursor-grab active:cursor-grabbing flex flex-col items-center text-center group"
               >
-                <div className="w-10 h-10 rounded-lg bg-indigo-50 text-primary flex items-center justify-center mb-2 group-hover:scale-110 transition-transform">
+                <div className="w-9 h-9 bg-primary-100 text-primary flex items-center justify-center mb-2 group-hover:scale-105 transition-transform">
                   {getCategoryIcon(item.categoryName || 'Beds')}
                 </div>
-                <span className="text-xs font-semibold text-slate-800 line-clamp-1">{item.name}</span>
-                <span className="text-[10px] text-slate-400 mt-0.5 font-medium">
+                <span className="text-xs font-semibold text-ink line-clamp-1">{item.name}</span>
+                <span className="text-[10px] text-ink-muted mt-0.5 font-medium">
                   {item.defaultWidthFt}ft × {item.defaultHeightFt}ft
                 </span>
-                <span className="text-[10px] font-bold text-primary mt-1">
+                <span className="text-[10px] font-bold text-brass mt-1">
                   ₹{item.basePrice.toLocaleString('en-IN')}
                 </span>
               </div>
@@ -411,12 +449,11 @@ export const DesignStudioPage: React.FC = () => {
           onDragLeave={() => setIsDraggingOver(false)}
           onDrop={handleDrop}
           onClick={() => selectItem(null)}
-          className={`lg:col-span-6 card !p-6 h-[620px] bg-[#EAE8E3] rounded-2xl flex flex-col items-center justify-center relative overflow-hidden transition-all ${
-            isDraggingOver ? 'ring-4 ring-primary/40 bg-indigo-50/50' : ''
+          className={`lg:col-span-6 h-[calc(100vh-8rem)] min-h-[560px] bg-[#C9B8A0]/45 border border-surface-border flex flex-col items-center justify-center relative overflow-hidden transition-all ${
+            isDraggingOver ? 'ring-2 ring-primary/50 bg-primary-50/40' : ''
           }`}
         >
-          {/* Canvas Blueprint Grid Background */}
-          <div className="absolute inset-0 opacity-15 bg-[radial-gradient(#64748B_1px,transparent_1px)] [background-size:16px_16px]" />
+          <div className="absolute inset-0 opacity-20 bg-[radial-gradient(#5C574E_1px,transparent_1px)] [background-size:16px_16px]" />
 
           {/* The 3D scene uses the same Zustand layout objects as the 2D plan. */}
           {is3DView ? (
@@ -424,7 +461,7 @@ export const DesignStudioPage: React.FC = () => {
           ) : (
             /* 2D Floor Plan Canvas (To Scale) */
             <div 
-              className="relative bg-[#DFD8CC] border-4 border-[#3D3A37] rounded shadow-2xl transition-all"
+              className="relative bg-[#DFD8CC] border-[3px] border-ink shadow-card-hover transition-all"
               style={{
                 width: `${lengthFt * pxScale}px`,
                 height: `${widthFt * pxScale}px`,
@@ -433,35 +470,45 @@ export const DesignStudioPage: React.FC = () => {
               }}
               onClick={(e) => e.stopPropagation()}
             >
-              {/* Floor Wood Plank Texture Simulation */}
-              <div className="absolute inset-0 opacity-25 bg-[repeating-linear-gradient(90deg,#CBBFA8,#CBBFA8_20px,#B9AC95_20px,#B9AC95_40px)]" />
+              {photoBackdropUrl ? (
+                <img
+                  src={photoBackdropUrl}
+                  alt="Room photo reference"
+                  className="absolute inset-0 w-full h-full object-cover pointer-events-none"
+                  style={{ opacity: photoBackdropOpacity }}
+                />
+              ) : (
+                <div className="absolute inset-0 opacity-25 bg-[repeating-linear-gradient(90deg,#CBBFA8,#CBBFA8_20px,#B9AC95_20px,#B9AC95_40px)]" />
+              )}
+              <div className="absolute inset-0 opacity-15 bg-[radial-gradient(#5C574E_1px,transparent_1px)] [background-size:12px_12px] pointer-events-none" />
 
-              {/* Edge Dimension Labels (Matching Screen 6) */}
-              {/* Top Edge (Length) */}
-              <div className="absolute -top-7 left-1/2 -translate-x-1/2 bg-white px-2 py-0.5 rounded shadow-sm border border-slate-200 text-[11px] font-bold text-slate-800">
+              <div className="absolute -top-7 left-1/2 -translate-x-1/2 bg-surface-card px-2 py-0.5 border border-surface-border text-[11px] font-bold text-ink">
                 {lengthFt} ft
               </div>
-              {/* Right Edge (Width) */}
-              <div className="absolute -right-9 top-1/2 -translate-y-1/2 bg-white px-2 py-0.5 rounded shadow-sm border border-slate-200 text-[11px] font-bold text-slate-800 rotate-90">
+              <div className="absolute -right-9 top-1/2 -translate-y-1/2 bg-surface-card px-2 py-0.5 border border-surface-border text-[11px] font-bold text-ink rotate-90">
                 {widthFt} ft
               </div>
 
-              {/* Placed Furniture Items on Canvas */}
               {items.map((item) => {
                 const isSelected = selectedItemId === item.id;
                 const widthPx = item.widthFt * pxScale;
                 const heightPx = item.heightFt * pxScale;
                 const leftPx = item.x * pxScale;
                 const topPx = item.y * pxScale;
+                const isInvalid = invalidItemIds.has(item.id);
 
                 return (
                   <div
                     key={item.id}
                     onMouseDown={(e) => handleCanvasItemMouseDown(e, item)}
-                    className={`absolute select-none cursor-move transition-shadow rounded flex items-center justify-center text-center border ${
+                    className={`absolute select-none cursor-move flex items-center justify-center text-center border ${
+                      isLayoutAnimating ? 'transition-[left,top,transform] duration-500 ease-out' : 'transition-shadow'
+                    } ${
                       isSelected
-                        ? 'ring-2 ring-primary border-primary bg-amber-100/90 shadow-lg z-20'
-                        : 'border-slate-700/60 bg-amber-50/90 hover:border-primary shadow-sm z-10'
+                        ? 'ring-2 ring-primary border-primary bg-brass-soft/90 shadow-lg z-20'
+                        : isInvalid
+                          ? 'border-[#9B3B2E] bg-[#9B3B2E]/20 z-10'
+                          : 'border-ink/50 bg-[#E8DCC8]/90 hover:border-primary shadow-sm z-10'
                     }`}
                     style={{
                       left: `${leftPx}px`,
@@ -474,21 +521,20 @@ export const DesignStudioPage: React.FC = () => {
                   >
                     {/* Visual Item Blueprint Design */}
                     <div className="p-1 flex flex-col items-center justify-center overflow-hidden w-full h-full pointer-events-none">
-                      <span className="text-[10px] font-bold text-slate-900 leading-tight truncate max-w-full">
+                      <span className="text-[10px] font-bold text-ink leading-tight truncate max-w-full">
                         {item.name}
                       </span>
-                      <span className="text-[8px] text-slate-600 font-semibold truncate">
+                      <span className="text-[8px] text-ink-muted font-semibold truncate">
                         {item.widthFt}' × {item.heightFt}'
                       </span>
                     </div>
 
-                    {/* Resize/Rotation Handles when Selected */}
                     {isSelected && (
                       <>
-                        <div className="absolute -top-1 -left-1 w-2.5 h-2.5 bg-primary border border-white rounded-full" />
-                        <div className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-primary border border-white rounded-full" />
-                        <div className="absolute -bottom-1 -left-1 w-2.5 h-2.5 bg-primary border border-white rounded-full" />
-                        <div className="absolute -bottom-1 -right-1 w-2.5 h-2.5 bg-primary border border-white rounded-full" />
+                        <div className="absolute -top-1 -left-1 w-2 h-2 bg-primary border border-surface-card" />
+                        <div className="absolute -top-1 -right-1 w-2 h-2 bg-primary border border-surface-card" />
+                        <div className="absolute -bottom-1 -left-1 w-2 h-2 bg-primary border border-surface-card" />
+                        <div className="absolute -bottom-1 -right-1 w-2 h-2 bg-primary border border-surface-card" />
                       </>
                     )}
                   </div>
@@ -497,125 +543,159 @@ export const DesignStudioPage: React.FC = () => {
             </div>
           )}
 
-          {/* Canvas Floating Overlay Info */}
-          <div className="absolute bottom-3 left-3 bg-white/90 backdrop-blur px-2.5 py-1 rounded-lg text-[10px] font-semibold text-slate-700 shadow-sm border border-slate-200">
-            Scale: 1 ft = {Math.round(pxScale)}px • {items.length} items placed
+          <div className="absolute bottom-3 left-3 bg-surface-card/95 px-2.5 py-1 text-[10px] font-semibold text-ink border border-surface-border flex items-center gap-2">
+            <span>Scale: 1 ft = {Math.round(pxScale)}px · {items.length} pieces</span>
+            {predictedCost != null && (
+              <span className="text-brass font-bold">· ≈ ₹{predictedCost.toLocaleString('en-IN')}</span>
+            )}
           </div>
-          {invalidItemIds.size > 0 && <div className="absolute bottom-3 right-3 rounded-lg border border-red-200 bg-red-50 px-2.5 py-1 text-[10px] font-semibold text-red-700">{invalidItemIds.size} item(s) overlap — reposition before saving</div>}
+          {photoBackdropUrl && (
+            <button
+              type="button"
+              onClick={() => setPhotoBackdrop(null)}
+              className="absolute top-3 right-3 bg-surface-card/95 px-2 py-1 text-[10px] font-semibold text-ink-muted border border-surface-border hover:text-ink"
+            >
+              Clear photo
+            </button>
+          )}
+          {invalidItemIds.size > 0 && <div className="absolute bottom-3 right-3 border border-[#9B3B2E]/40 bg-[#9B3B2E]/10 px-2.5 py-1 text-[10px] font-semibold text-[#9B3B2E]">{invalidItemIds.size} overlap — fix before saving</div>}
         </div>
 
-        {/* Right Panel: Properties Inspector (Reference Screen 6 Right) */}
-        <div className="lg:col-span-3 card !p-5 h-[620px] flex flex-col justify-between overflow-y-auto">
-          <div className="mb-4 rounded-xl border border-indigo-100 bg-indigo-50/60 p-3 text-xs">
-            <div className="mb-2 flex items-center gap-1.5 font-bold text-primary"><Sparkles className="h-3.5 w-3.5" /> Live design analysis</div>
-            <div className="grid grid-cols-2 gap-y-1.5 text-slate-600"><span>{items.length} furniture items</span><span>{analysis.walkablePercent.toFixed(0)}% walkable</span><span>{analysis.utilizationPercent.toFixed(0)}% utilized</span><span>{analysis.freeAreaSqFt.toFixed(1)} ft² free</span></div>
-            <p className={`mt-2 font-semibold ${analysis.collisionPairs.length || analysis.boundaryItemIds.length ? 'text-amber-700' : 'text-emerald-700'}`}>{analysis.collisionPairs.length ? `⚠ ${analysis.collisionPairs.length} collision${analysis.collisionPairs.length > 1 ? 's' : ''}` : analysis.boundaryItemIds.length ? '⚠ Boundary issue' : '✓ Layout boundary valid'}</p>
-            <p className="mt-1 text-[11px] leading-relaxed text-slate-600">{analysis.recommendation}</p>
-          </div>
-          {selectedItem ? (
-            <div className="space-y-4">
-              <div className="pb-3 border-b border-slate-100">
-                <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">Properties</h3>
-                <p className="text-sm font-bold text-primary mt-1">{selectedItem.name}</p>
-              </div>
-
-              <div className="space-y-3">
-                <div>
-                  <label className="block text-[11px] font-semibold text-slate-600 uppercase tracking-wider mb-1">
-                    Length (ft)
-                  </label>
-                  <input
-                    type="number"
-                    step={0.5}
-                    min={0.5}
-                    value={selectedItem.widthFt}
-                    onChange={(e) => updateItem(selectedItem.id, { widthFt: parseFloat(e.target.value) || 1 })}
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold text-slate-800 focus:ring-2 focus:ring-primary/20 focus:border-primary"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-[11px] font-semibold text-slate-600 uppercase tracking-wider mb-1">
-                    Width / Depth (ft)
-                  </label>
-                  <input
-                    type="number"
-                    step={0.5}
-                    min={0.5}
-                    value={selectedItem.heightFt}
-                    onChange={(e) => updateItem(selectedItem.id, { heightFt: parseFloat(e.target.value) || 1 })}
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold text-slate-800 focus:ring-2 focus:ring-primary/20 focus:border-primary"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-[11px] font-semibold text-slate-600 uppercase tracking-wider mb-1">
-                    Height (ft)
-                  </label>
-                  <input
-                    type="number"
-                    step={0.5}
-                    min={0.5}
-                    value={selectedItem.verticalHeightFt || 2.5}
-                    onChange={(e) => updateItem(selectedItem.id, { verticalHeightFt: parseFloat(e.target.value) || 1 })}
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold text-slate-800 focus:ring-2 focus:ring-primary/20 focus:border-primary"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-[11px] font-semibold text-slate-600 uppercase tracking-wider mb-1">
-                    Rotation (°)
-                  </label>
-                  <input
-                    type="number"
-                    step={15}
-                    value={selectedItem.rotation}
-                    onChange={(e) => updateItem(selectedItem.id, { rotation: parseFloat(e.target.value) || 0 })}
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold text-slate-800 focus:ring-2 focus:ring-primary/20 focus:border-primary"
-                  />
-                </div>
-              </div>
-
-              {/* Material Customization Summary Tag */}
-              {selectedItem.customizations?.materialName && (
-                <div className="p-3 bg-indigo-50 rounded-xl border border-indigo-100 text-xs space-y-1 text-primary">
-                  <div className="font-bold">Custom Specs:</div>
-                  <div className="text-[11px] text-slate-700">{selectedItem.customizations.materialName}</div>
-                  {selectedItem.customizations.finishName && (
-                    <div className="text-[11px] text-slate-500">Finish: {selectedItem.customizations.finishName}</div>
-                  )}
-                </div>
-              )}
-            </div>
-          ) : (
-            <div className="flex flex-col items-center justify-center text-center h-full text-slate-400 py-12">
-              <Sliders className="w-10 h-10 mb-2 opacity-50" />
-              <p className="text-xs font-medium">Select an item on the canvas to inspect & configure properties</p>
-            </div>
-          )}
-
-          {/* Action: Open Customize Item Screen (Reference Screen 7) */}
-          <div className="pt-4 border-t border-slate-100 space-y-2">
+        <div className="lg:col-span-3 panel-quiet !p-4 h-[calc(100vh-8rem)] min-h-[560px] flex flex-col overflow-hidden">
+          <div className="flex gap-1 mb-3 border-b border-surface-border pb-2">
             <button
-              onClick={() => {
-                if (selectedItem) {
-                  navigate(`/projects/${id || 'proj-1'}/design/customize/${selectedItem.id}`);
-                } else {
-                  toast.error('Please select an item to customize');
-                }
-              }}
-              disabled={!selectedItem}
-              className="w-full py-2.5 bg-primary hover:bg-primary-600 active:bg-primary-700 text-white font-semibold text-xs rounded-xl shadow-md shadow-primary/25 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+              type="button"
+              onClick={() => setRightTab('coach')}
+              className={`flex-1 py-1.5 text-[11px] font-semibold ${rightTab === 'coach' ? 'bg-primary text-[#F7F6F2]' : 'text-ink-muted hover:bg-plaster/60'}`}
             >
-              <Settings2 className="w-3.5 h-3.5" />
-              <span>Customize Item</span>
+              AI coach
+            </button>
+            <button
+              type="button"
+              onClick={() => setRightTab('props')}
+              className={`flex-1 py-1.5 text-[11px] font-semibold ${rightTab === 'props' ? 'bg-primary text-[#F7F6F2]' : 'text-ink-muted hover:bg-plaster/60'}`}
+            >
+              Properties
             </button>
           </div>
 
+          {rightTab === 'coach' ? (
+            <div className="flex-1 min-h-0 overflow-hidden">
+              <StudioAICoach
+                roomType={roomType || 'BEDROOM'}
+                lengthFt={lengthFt}
+                widthFt={widthFt}
+                heightFt={heightFt}
+                items={items}
+                catalog={catalogItems}
+                analysis={analysis}
+                onReplaceItems={(next, animate) => replaceItems(next, { animate })}
+                onSetPositions={(next, animate) => setItemsPositions(next, { animate })}
+                onApplySuggestion={applySuggestion}
+                predictedCost={predictedCost}
+                costRange={costRange}
+                costSource={costSource}
+              />
+            </div>
+          ) : (
+            <div className="flex-1 min-h-0 overflow-y-auto flex flex-col justify-between">
+              <div className="mb-3 border border-primary/20 bg-primary-50/50 p-3 text-xs">
+                <div className="mb-2 flex items-center gap-1.5 font-bold text-primary"><Sparkles className="h-3.5 w-3.5" /> Layout check</div>
+                <div className="grid grid-cols-2 gap-y-1.5 text-ink-muted">
+                  <span>Score: {analysis.score}/100</span>
+                  <span>{analysis.walkablePercent.toFixed(0)}% walkable</span>
+                </div>
+                <p className="mt-2 text-[11px] text-ink-muted leading-relaxed">{analysis.recommendation}</p>
+              </div>
+
+              {selectedItem ? (
+                <div className="space-y-4 flex-1">
+                  <div className="pb-3 border-b border-surface-border">
+                    <h3 className="text-[11px] font-bold text-ink-muted uppercase tracking-[0.12em]">Properties</h3>
+                    <p className="font-display text-xl text-ink mt-1">{selectedItem.name}</p>
+                  </div>
+                  <div className="space-y-3">
+                    {([
+                      { label: 'Length (ft)', key: 'widthFt' as const, step: 0.5 },
+                      { label: 'Width / Depth (ft)', key: 'heightFt' as const, step: 0.5 },
+                      { label: 'Height (ft)', key: 'verticalHeightFt' as const, step: 0.5 },
+                      { label: 'Rotation (°)', key: 'rotation' as const, step: 15 },
+                    ]).map((field) => (
+                      <div key={field.label}>
+                        <label className="block text-[11px] font-semibold text-ink-muted uppercase tracking-[0.1em] mb-1">
+                          {field.label}
+                        </label>
+                        <input
+                          type="number"
+                          step={field.step}
+                          min={field.key === 'rotation' ? undefined : 0.5}
+                          value={
+                            field.key === 'verticalHeightFt'
+                              ? selectedItem.verticalHeightFt || 2.5
+                              : selectedItem[field.key]
+                          }
+                          onChange={(e) =>
+                            updateItem(selectedItem.id, {
+                              [field.key]: parseFloat(e.target.value) || 0,
+                            })
+                          }
+                          className="input-studio !py-2 text-xs font-semibold"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                  {selectedItem.customizations?.materialName && (
+                    <div className="p-3 bg-primary-50 border border-primary/15 text-xs space-y-1 text-primary">
+                      <div className="font-bold">Specs</div>
+                      <div className="text-[11px] text-ink">{selectedItem.customizations.materialName}</div>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center text-center flex-1 text-ink-muted py-8">
+                  <Sliders className="w-8 h-8 mb-2 opacity-40" />
+                  <p className="text-xs font-medium">Select a piece on the plan to edit</p>
+                </div>
+              )}
+
+              <div className="pt-4 border-t border-surface-border space-y-2">
+                <button
+                  onClick={() => {
+                    if (selectedItem) {
+                      navigate(`/projects/${id || 'proj-1'}/design/customize/${selectedItem.id}`);
+                    } else {
+                      toast.error('Please select an item to customize');
+                    }
+                  }}
+                  disabled={!selectedItem}
+                  className="w-full btn-primary !py-2.5 text-xs flex items-center justify-center gap-2 disabled:opacity-50"
+                >
+                  <Settings2 className="w-3.5 h-3.5" />
+                  <span>Customize piece</span>
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
       </div>
-      {isPhotoWorkflowOpen && <PhotoReconstructionPanel onClose={() => setIsPhotoWorkflowOpen(false)} />}
+      {isPhotoWorkflowOpen && (
+        <PhotoReconstructionPanel
+          onClose={() => setIsPhotoWorkflowOpen(false)}
+          catalog={catalogItems}
+          roomType={roomType || 'BEDROOM'}
+          onImport={({ backdropUrl, lengthFt: L, widthFt: W, items: imported, message }) => {
+            setPhotoBackdrop(backdropUrl, 0.38);
+            setRoomDimensions(L, W, heightFt);
+            replaceItems(imported, { animate: true });
+            setTimeout(() => replaceItems(imported, { animate: false }), 700);
+            setIsPhotoWorkflowOpen(false);
+            setRightTab('coach');
+            toast.success('Photo scene placed — refine footprints');
+            if (message) toast(message, { duration: 4000 });
+          }}
+        />
+      )}
     </div>
   );
 };

@@ -1,17 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { 
-  ArrowLeft, 
-  RotateCw, 
-  ZoomIn, 
-  ZoomOut, 
-  Check, 
-  Save, 
-  Sliders, 
-  Sparkles,
-  Layers,
-  Box
-} from 'lucide-react';
+import { ArrowLeft, RotateCw, ZoomIn, ZoomOut, Check, Save, Sliders } from 'lucide-react';
 import { useLayoutStore } from '../stores/useLayoutStore';
 import toast from 'react-hot-toast';
 
@@ -22,7 +11,6 @@ export const CustomizeItemPage: React.FC = () => {
 
   const currentItem = items.find((i) => i.id === itemId) || items[0];
 
-  // Customization Form State (Matching Reference Screen 7)
   const [material, setMaterial] = useState(currentItem?.customizations?.materialName || 'Plywood 18mm');
   const [finish, setFinish] = useState(currentItem?.customizations?.finishName || 'Sunmica - Dark Walnut');
   const [selectedColor, setSelectedColor] = useState(currentItem?.customizations?.colorHex || '#5C4033');
@@ -30,7 +18,6 @@ export const CustomizeItemPage: React.FC = () => {
   const [internalSetup, setInternalSetup] = useState(currentItem?.customizations?.internalSetup || '2 Doors + 4 Shelves + 2 Drawers');
   const [softClose, setSoftClose] = useState(currentItem?.customizations?.softClose ?? true);
 
-  // Color Swatches
   const colorOptions = [
     { name: 'Dark Walnut', hex: '#5C4033' },
     { name: 'Warm Teak', hex: '#8B6914' },
@@ -48,253 +35,171 @@ export const CustomizeItemPage: React.FC = () => {
           materialPricePerSqFt: 85,
           finishName: finish,
           colorHex: selectedColor,
-          colorName: colorOptions.find(c => c.hex === selectedColor)?.name || 'Custom',
+          colorName: colorOptions.find((c) => c.hex === selectedColor)?.name || 'Custom',
           hardwareName: handleType,
           internalSetup,
           softClose,
-        }
+        },
       });
-      toast.success('Customization specs saved');
+      toast.success('Specs saved');
     }
     navigate(`/projects/${id || 'proj-1'}/design`);
   };
 
   return (
-    <div className="space-y-4">
-      {/* Top Bar */}
-      <div className="flex items-center justify-between">
+    <div className="space-y-4 animate-space-fade">
+      <div className="flex items-center justify-between gap-3">
         <button
           onClick={() => navigate(`/projects/${id || 'proj-1'}/design`)}
-          className="btn-outline flex items-center gap-2 text-xs py-2"
+          className="btn-outline flex items-center gap-2 text-xs"
         >
           <ArrowLeft className="w-4 h-4" />
-          <span>Back to Studio</span>
+          Studio
         </button>
-
-        <div className="flex items-center gap-2">
-          <span className="text-xs font-semibold text-slate-500">Item Customizer</span>
-          <button
-            onClick={handleSave}
-            className="btn-primary flex items-center gap-2 text-xs py-2 shadow-md shadow-primary/25"
-          >
-            <Save className="w-4 h-4" />
-            <span>Apply Changes</span>
-          </button>
-        </div>
+        <button onClick={handleSave} className="btn-primary flex items-center gap-2 text-xs">
+          <Save className="w-4 h-4" />
+          Apply
+        </button>
       </div>
 
-      {/* Screen 7 3-Column Layout: Mini Left Sidebar + Center Visualizer + Right Config Form */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-stretch min-h-[580px]">
-        
-        {/* Left Dark Sidebar: Active Item Header (Reference Screen 7 Left) */}
-        <div className="lg:col-span-2 bg-sidebar rounded-2xl p-4 text-white flex flex-col justify-between shadow-sidebar">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-stretch min-h-[580px]">
+        <div className="lg:col-span-2 bg-sidebar p-4 text-[#F7F6F2] flex flex-col justify-between">
           <div>
-            <div className="flex items-center gap-2 text-primary-300 mb-6 pb-3 border-b border-slate-800">
+            <div className="flex items-center gap-2 text-brass-soft mb-6 pb-3 border-b border-sidebar-border">
               <Sliders className="w-4 h-4" />
-              <span className="text-xs font-bold uppercase tracking-wider">Customization</span>
+              <span className="text-[11px] font-bold uppercase tracking-[0.14em]">Customize</span>
             </div>
-
             <div className="space-y-3">
-              <div className="p-3 bg-primary/20 border border-primary/40 rounded-xl">
-                <span className="text-[10px] uppercase font-bold text-primary-300 tracking-wider">Target Item</span>
-                <h3 className="text-sm font-bold text-white mt-0.5">{currentItem?.name || 'Wardrobe'}</h3>
-                <p className="text-[11px] text-slate-400 mt-1">{currentItem?.widthFt}' × {currentItem?.heightFt}' Footprint</p>
+              <div className="p-3 border border-primary/40 bg-primary/20">
+                <span className="text-[10px] uppercase font-bold text-brass-soft tracking-[0.12em]">Piece</span>
+                <h3 className="font-display text-lg text-[#F7F6F2] mt-0.5">{currentItem?.name || 'Wardrobe'}</h3>
+                <p className="text-[11px] text-[#A8A498] mt-1">
+                  {currentItem?.widthFt}' × {currentItem?.heightFt}'
+                </p>
               </div>
-
-              <div className="p-3 bg-slate-900/60 rounded-xl border border-slate-800 text-xs space-y-1">
-                <span className="text-[10px] text-slate-400 uppercase font-semibold">Live Cost Adder</span>
-                <p className="text-sm font-black text-emerald-400">+₹8,500</p>
+              <div className="p-3 border border-sidebar-border text-xs">
+                <span className="text-[10px] text-[#7A756C] uppercase font-semibold">Est. adder</span>
+                <p className="font-display text-xl text-brass-soft mt-0.5">+₹8,500</p>
               </div>
             </div>
           </div>
-
-          <div className="p-3 bg-slate-900/80 rounded-xl border border-slate-800/80 text-[11px] text-slate-400">
-            Precision joinery and hardware specs will be synced into the quotation PDF.
-          </div>
+          <p className="text-[11px] text-[#7A756C] leading-relaxed">
+            Joinery and hardware sync into the quotation.
+          </p>
         </div>
 
-        {/* Center: Large 3D / Render Product Preview (Reference Screen 7 Center) */}
-        <div className="lg:col-span-6 card !p-0 bg-slate-100/80 rounded-2xl flex flex-col items-center justify-between relative overflow-hidden">
-          
-          {/* Top Floating Mini Toolbar */}
-          <div className="absolute top-4 right-4 z-10 flex items-center gap-1.5 bg-white/90 backdrop-blur p-1 rounded-xl shadow-sm border border-slate-200">
-            <button className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-600">
-              <RotateCw className="w-4 h-4" />
-            </button>
-            <button className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-600">
-              <ZoomIn className="w-4 h-4" />
-            </button>
-            <button className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-600">
-              <ZoomOut className="w-4 h-4" />
-            </button>
+        <div className="lg:col-span-6 bg-plaster/50 border border-surface-border flex flex-col relative overflow-hidden min-h-[420px]">
+          <div className="absolute top-4 right-4 z-10 flex items-center gap-1 bg-surface-card/95 p-1 border border-surface-border">
+            <button className="p-1.5 text-ink-muted hover:text-ink"><RotateCw className="w-4 h-4" /></button>
+            <button className="p-1.5 text-ink-muted hover:text-ink"><ZoomIn className="w-4 h-4" /></button>
+            <button className="p-1.5 text-ink-muted hover:text-ink"><ZoomOut className="w-4 h-4" /></button>
           </div>
 
-          {/* Render Preview Visual */}
           <div className="flex-1 w-full flex items-center justify-center p-8">
-            <div className="relative w-64 h-80 rounded-2xl shadow-2xl transition-all duration-300 flex items-center justify-center border-4 border-slate-800/20"
-                 style={{ backgroundColor: selectedColor }}>
-              
-              {/* Simulated Furniture Render Detail */}
-              <div className="w-full h-full p-4 flex flex-col justify-between relative overflow-hidden rounded-xl">
-                {/* Wood Grain Overlay */}
+            <div
+              className="relative w-64 h-80 shadow-card-hover border-[3px] border-ink/20 flex items-center justify-center transition-colors duration-300"
+              style={{ backgroundColor: selectedColor }}
+            >
+              <div className="w-full h-full p-4 flex flex-col justify-between relative overflow-hidden">
                 <div className="absolute inset-0 opacity-20 bg-[repeating-linear-gradient(0deg,#000,#000_10px,transparent_10px,transparent_20px)]" />
-
-                {/* Door Panels Split */}
-                <div className="absolute inset-y-2 left-1/2 w-0.5 bg-slate-900/60 -translate-x-1/2" />
-                
-                {/* Handles Simulation */}
-                <div className="absolute left-[45%] top-1/2 -translate-y-1/2 w-2 h-10 bg-slate-300 rounded shadow-md" />
-                <div className="absolute right-[45%] top-1/2 -translate-y-1/2 w-2 h-10 bg-slate-300 rounded shadow-md" />
-
-                <div className="relative z-10 bg-black/40 backdrop-blur-sm px-2.5 py-1 rounded-md text-white text-[10px] font-bold self-start">
+                <div className="absolute inset-y-2 left-1/2 w-0.5 bg-ink/50 -translate-x-1/2" />
+                <div className="absolute left-[45%] top-1/2 -translate-y-1/2 w-2 h-10 bg-[#D4D0C8] shadow-sm" />
+                <div className="absolute right-[45%] top-1/2 -translate-y-1/2 w-2 h-10 bg-[#D4D0C8] shadow-sm" />
+                <div className="relative z-10 bg-ink/50 px-2.5 py-1 text-[#F7F6F2] text-[10px] font-bold self-start">
                   {finish}
                 </div>
-
-                <div className="relative z-10 bg-white/90 px-2.5 py-1 rounded-md text-slate-900 text-[10px] font-bold self-end shadow-sm">
+                <div className="relative z-10 bg-surface-card/95 px-2.5 py-1 text-ink text-[10px] font-bold self-end border border-surface-border">
                   {material}
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Bottom Preview Badge */}
-          <div className="w-full p-3 bg-white/80 border-t border-slate-200 text-center text-xs font-semibold text-slate-600">
-            Interactive Material & Finish Preview • 360° Raytraced Mesh
+          <div className="w-full p-3 border-t border-surface-border text-center text-xs font-semibold text-ink-muted bg-surface-card/70">
+            Material preview · live swatch
           </div>
         </div>
 
-        {/* Right Panel: Customization Form (Reference Screen 7 Right) */}
-        <div className="lg:col-span-4 card space-y-4 flex flex-col justify-between">
+        <div className="lg:col-span-4 panel-quiet p-5 space-y-4 flex flex-col justify-between">
           <div className="space-y-4">
-            
-            {/* Material */}
             <div>
-              <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
-                Material
-              </label>
-              <select
-                value={material}
-                onChange={(e) => setMaterial(e.target.value)}
-                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 focus:ring-2 focus:ring-primary/20 focus:border-primary"
-              >
-                <option value="Plywood 18mm">Plywood 18mm (Commercial Grade)</option>
+              <label className="block text-[11px] font-bold text-ink-muted uppercase tracking-[0.12em] mb-1.5">Material</label>
+              <select value={material} onChange={(e) => setMaterial(e.target.value)} className="input-studio text-xs">
+                <option value="Plywood 18mm">Plywood 18mm</option>
                 <option value="Plywood 12mm">Plywood 12mm</option>
-                <option value="Blockboard">Blockboard (Moisture Resistant)</option>
-                <option value="MDF 18mm">MDF 18mm High Density</option>
-                <option value="Solid Teak">Solid Teak Wood</option>
+                <option value="Blockboard">Blockboard</option>
+                <option value="MDF 18mm">MDF 18mm</option>
+                <option value="Solid Teak">Solid Teak</option>
               </select>
             </div>
-
-            {/* Finish / Laminate */}
             <div>
-              <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
-                Finish / Laminate
-              </label>
-              <select
-                value={finish}
-                onChange={(e) => setFinish(e.target.value)}
-                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 focus:ring-2 focus:ring-primary/20 focus:border-primary"
-              >
+              <label className="block text-[11px] font-bold text-ink-muted uppercase tracking-[0.12em] mb-1.5">Finish</label>
+              <select value={finish} onChange={(e) => setFinish(e.target.value)} className="input-studio text-xs">
                 <option value="Sunmica - Dark Walnut">Sunmica - Dark Walnut</option>
                 <option value="Sunmica - White Matte">Sunmica - White Matte</option>
                 <option value="Sunmica - Natural Oak">Sunmica - Natural Oak</option>
                 <option value="Acrylic High Gloss">Acrylic High Gloss</option>
-                <option value="PU Matte Polyurethane">PU Matte Polyurethane</option>
+                <option value="PU Matte Polyurethane">PU Matte</option>
               </select>
             </div>
-
-            {/* Color Swatches */}
             <div>
-              <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-2">
-                Color Swatches
-              </label>
-              <div className="flex items-center gap-2.5 flex-wrap">
+              <label className="block text-[11px] font-bold text-ink-muted uppercase tracking-[0.12em] mb-2">Color</label>
+              <div className="flex items-center gap-2 flex-wrap">
                 {colorOptions.map((c) => (
                   <button
                     key={c.hex}
                     type="button"
                     onClick={() => setSelectedColor(c.hex)}
                     title={c.name}
-                    className={`w-7 h-7 rounded-full transition-all shadow-sm flex items-center justify-center ${
-                      selectedColor === c.hex
-                        ? 'ring-2 ring-primary ring-offset-2 scale-110'
-                        : 'hover:scale-105 border border-slate-300'
+                    className={`w-7 h-7 transition-all flex items-center justify-center ${
+                      selectedColor === c.hex ? 'ring-2 ring-primary ring-offset-2 ring-offset-plaster scale-105' : 'border border-surface-border'
                     }`}
                     style={{ backgroundColor: c.hex }}
                   >
                     {selectedColor === c.hex && (
-                      <Check className={`w-3.5 h-3.5 ${c.hex === '#FDFBF7' ? 'text-slate-900' : 'text-white'}`} />
+                      <Check className={`w-3.5 h-3.5 ${c.hex === '#FDFBF7' ? 'text-ink' : 'text-white'}`} />
                     )}
                   </button>
                 ))}
               </div>
             </div>
-
-            {/* Handles */}
             <div>
-              <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
-                Handles & Hardware
-              </label>
-              <select
-                value={handleType}
-                onChange={(e) => setHandleType(e.target.value)}
-                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 focus:ring-2 focus:ring-primary/20 focus:border-primary"
-              >
-                <option value="Steel Handle">Brushed Steel Handle</option>
-                <option value="Gold Brass Handle">Gold Brass Concealed Handle</option>
-                <option value="Black Matte Handle">Black Matte Handle</option>
-                <option value="Push-to-Open (No Handles)">Push-to-Open (No Handles)</option>
+              <label className="block text-[11px] font-bold text-ink-muted uppercase tracking-[0.12em] mb-1.5">Hardware</label>
+              <select value={handleType} onChange={(e) => setHandleType(e.target.value)} className="input-studio text-xs">
+                <option value="Steel Handle">Brushed Steel</option>
+                <option value="Gold Brass Handle">Brass Concealed</option>
+                <option value="Black Matte Handle">Black Matte</option>
+                <option value="Push-to-Open (No Handles)">Push-to-Open</option>
               </select>
             </div>
-
-            {/* Internal Setup */}
             <div>
-              <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
-                Internal Setup
-              </label>
-              <select
-                value={internalSetup}
-                onChange={(e) => setInternalSetup(e.target.value)}
-                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 focus:ring-2 focus:ring-primary/20 focus:border-primary"
-              >
+              <label className="block text-[11px] font-bold text-ink-muted uppercase tracking-[0.12em] mb-1.5">Internal</label>
+              <select value={internalSetup} onChange={(e) => setInternalSetup(e.target.value)} className="input-studio text-xs">
                 <option value="2 Doors + 4 Shelves + 2 Drawers">2 Doors + 4 Shelves + 2 Drawers</option>
                 <option value="Full Hanging Rod + Top Shelf">Full Hanging Rod + Top Shelf</option>
                 <option value="Modular Storage + Organizer">Modular Storage + Organizer</option>
               </select>
             </div>
-
-            {/* Soft Close Toggle Switch */}
-            <div className="flex items-center justify-between pt-2 pb-1">
+            <div className="flex items-center justify-between pt-1">
               <div>
-                <span className="text-xs font-bold text-slate-800">Soft Close Hinges</span>
-                <p className="text-[11px] text-slate-400">Hydraulic silent dampening hinges</p>
+                <span className="text-xs font-bold text-ink">Soft close</span>
+                <p className="text-[11px] text-ink-muted">Hydraulic dampers</p>
               </div>
               <button
                 type="button"
                 onClick={() => setSoftClose(!softClose)}
-                className={`w-11 h-6 flex items-center rounded-full p-1 transition-colors ${
-                  softClose ? 'bg-primary' : 'bg-slate-300'
-                }`}
+                className={`w-11 h-6 flex items-center p-1 transition-colors ${softClose ? 'bg-primary' : 'bg-surface-border'}`}
               >
-                <div className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform ${
-                  softClose ? 'translate-x-5' : 'translate-x-0'
-                }`} />
+                <div className={`bg-surface-card w-4 h-4 shadow-sm transform transition-transform ${softClose ? 'translate-x-5' : 'translate-x-0'}`} />
               </button>
             </div>
-
           </div>
 
-          <div className="pt-4 border-t border-slate-100">
-            <button
-              onClick={handleSave}
-              className="w-full py-3 bg-primary hover:bg-primary-600 active:bg-primary-700 text-white font-semibold text-xs rounded-xl shadow-md shadow-primary/25 transition-all flex items-center justify-center gap-2"
-            >
-              <Check className="w-4 h-4" />
-              <span>Save & Return to Studio</span>
-            </button>
-          </div>
+          <button onClick={handleSave} className="w-full btn-primary !py-3 text-xs flex items-center justify-center gap-2">
+            <Check className="w-4 h-4" />
+            Save & return
+          </button>
         </div>
-
       </div>
     </div>
   );

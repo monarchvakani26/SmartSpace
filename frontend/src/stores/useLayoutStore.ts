@@ -9,6 +9,9 @@ interface LayoutStore extends RoomLayoutState {
   zoomLevel: number;
   pricingSettings: PricingSettings;
   is3DView: boolean;
+  photoBackdropUrl: string | null;
+  photoBackdropOpacity: number;
+  isLayoutAnimating: boolean;
 
   // Actions
   setRoomDimensions: (lengthFt: number, widthFt: number, heightFt: number) => void;
@@ -21,6 +24,10 @@ interface LayoutStore extends RoomLayoutState {
   setZoomLevel: (zoom: number) => void;
   toggle3DView: () => void;
   setPricingSettings: (settings: Partial<PricingSettings>) => void;
+  replaceItems: (items: LayoutItem[], opts?: { animate?: boolean }) => void;
+  setItemsPositions: (items: LayoutItem[], opts?: { animate?: boolean }) => void;
+  setPhotoBackdrop: (url: string | null, opacity?: number) => void;
+  setLayoutAnimating: (value: boolean) => void;
   
   // History
   undo: () => void;
@@ -107,6 +114,9 @@ export const useLayoutStore = create<LayoutStore>((set, get) => ({
   activeTool: 'select',
   zoomLevel: 1,
   is3DView: false,
+  photoBackdropUrl: null,
+  photoBackdropOpacity: 0.35,
+  isLayoutAnimating: false,
   pricingSettings: {
     profitMargin: 20,
     discount: 5,
@@ -117,6 +127,36 @@ export const useLayoutStore = create<LayoutStore>((set, get) => ({
   setRoomDimensions: (lengthFt, widthFt, heightFt) => set({ lengthFt, widthFt, heightFt }),
   
   setRoomDetails: (roomName, roomType, projectId) => set({ roomName, roomType, projectId }),
+
+  setPhotoBackdrop: (url, opacity = 0.35) =>
+    set({ photoBackdropUrl: url, photoBackdropOpacity: opacity }),
+
+  setLayoutAnimating: (value) => set({ isLayoutAnimating: value }),
+
+  replaceItems: (items, opts) => {
+    const { history, historyIndex } = get();
+    const newHistory = history.slice(0, historyIndex + 1);
+    newHistory.push(items);
+    set({
+      items,
+      selectedItemId: null,
+      history: newHistory,
+      historyIndex: newHistory.length - 1,
+      isLayoutAnimating: !!opts?.animate,
+    });
+  },
+
+  setItemsPositions: (items, opts) => {
+    const { history, historyIndex } = get();
+    const newHistory = history.slice(0, historyIndex + 1);
+    newHistory.push(items);
+    set({
+      items,
+      history: newHistory,
+      historyIndex: newHistory.length - 1,
+      isLayoutAnimating: !!opts?.animate,
+    });
+  },
 
   addItem: (itemData) => {
     const newItem: LayoutItem = {

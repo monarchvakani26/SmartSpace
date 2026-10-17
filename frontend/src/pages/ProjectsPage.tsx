@@ -1,8 +1,38 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { FolderKanban, Plus, Search, ArrowRight, Eye, Layers } from 'lucide-react';
+import { Plus, Search, ArrowRight } from 'lucide-react';
 import { apiService } from '../services/api';
 import { Project } from '../types';
+
+const roomTone = (type?: string) => {
+  switch (type) {
+    case 'KITCHEN':
+      return 'from-[#3D4A3A] to-[#6B7A5C]';
+    case 'LIVING_ROOM':
+      return 'from-[#4A3D32] to-[#8B7355]';
+    case 'BATHROOM':
+      return 'from-[#3A4548] to-[#6A7A7E]';
+    case 'OFFICE':
+      return 'from-[#2C3A42] to-[#5A6E78]';
+    case 'FULL_HOME':
+      return 'from-[#3A322C] to-[#6E5A48]';
+    default:
+      return 'from-[#2C4A3E] to-[#5A7A6A]';
+  }
+};
+
+const statusLabel = (status: string) => {
+  switch (status) {
+    case 'IN_PROGRESS':
+      return 'In progress';
+    case 'DESIGNING':
+      return 'Designing';
+    case 'QUOTATION':
+      return 'Quotation';
+    default:
+      return 'Active';
+  }
+};
 
 export const ProjectsPage: React.FC = () => {
   const [projects, setProjects] = useState<Project[]>([]);
@@ -12,96 +42,75 @@ export const ProjectsPage: React.FC = () => {
     apiService.getProjects().then(setProjects);
   }, []);
 
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'IN_PROGRESS':
-        return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-50 text-blue-600 border border-blue-200">In Progress</span>;
-      case 'DESIGNING':
-        return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-purple-50 text-purple-600 border border-purple-200">Designing</span>;
-      case 'QUOTATION':
-        return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-50 text-amber-600 border border-amber-200">Quotation</span>;
-      default:
-        return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-600 border border-emerald-200">Active</span>;
-    }
-  };
-
-  const filtered = projects.filter(p => 
-    p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (p.client?.name && p.client.name.toLowerCase().includes(searchTerm.toLowerCase()))
+  const filtered = projects.filter(
+    (p) =>
+      p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (p.client?.name && p.client.name.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <div className="space-y-8 animate-space-rise">
+      <header className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Projects</h1>
-          <p className="text-xs text-slate-500 mt-0.5">Interior design workspaces, 2D floor plans, and quotation status.</p>
+          <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-ink-muted mb-2">Studio</p>
+          <h1 className="font-display text-4xl text-ink tracking-tight">Projects</h1>
+          <p className="text-sm text-ink-muted mt-2 max-w-md">
+            Rooms in progress — open any space to continue the layout.
+          </p>
         </div>
-        <Link to="/projects/new" className="btn-primary flex items-center gap-2 text-xs">
+        <Link to="/projects/new" className="btn-primary flex items-center gap-2 text-sm self-start">
           <Plus className="w-4 h-4" />
-          <span>+ Create Project</span>
+          <span>New project</span>
         </Link>
+      </header>
+
+      <div className="relative max-w-sm">
+        <Search className="w-4 h-4 text-ink-muted absolute left-3 top-1/2 -translate-y-1/2" />
+        <input
+          type="text"
+          placeholder="Search by room or client…"
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="input-studio pl-9"
+        />
       </div>
 
-      <div className="card !p-0 overflow-hidden">
-        <div className="p-4 border-b border-slate-100 flex items-center justify-between gap-3 bg-slate-50/40">
-          <div className="relative w-full sm:w-72">
-            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-            <input
-              type="text"
-              placeholder="Search projects..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-9 pr-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs focus:ring-2 focus:ring-primary/20 focus:border-primary text-slate-800"
-            />
-          </div>
-        </div>
-
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr>
-                <th className="table-header">Project Name</th>
-                <th className="table-header">Client</th>
-                <th className="table-header">Type</th>
-                <th className="table-header">Status</th>
-                <th className="table-header">Last Updated</th>
-                <th className="table-header text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-50">
-              {filtered.map((project) => (
-                <tr key={project.id} className="hover:bg-slate-50/80 transition-colors">
-                  <td className="table-cell font-bold text-slate-900">
-                    {project.name}
-                  </td>
-                  <td className="table-cell text-slate-600">
-                    {project.client?.name || 'Rohan Mehta'}
-                  </td>
-                  <td className="table-cell text-slate-500 text-xs capitalize">
-                    {project.type.toLowerCase().replace('_', ' ')}
-                  </td>
-                  <td className="table-cell">
-                    {getStatusBadge(project.status)}
-                  </td>
-                  <td className="table-cell text-slate-500 text-xs">
-                    {project.updatedAt}
-                  </td>
-                  <td className="table-cell text-right">
-                    <Link
-                      to={`/projects/${project.id}/design`}
-                      className="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline"
-                    >
-                      <span>Design Studio</span>
-                      <ArrowRight className="w-3.5 h-3.5" />
-                    </Link>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6">
+        {filtered.map((project, i) => (
+          <Link
+            key={project.id}
+            to={`/projects/${project.id}/design`}
+            className="group block animate-space-rise"
+            style={{ animationDelay: `${i * 40}ms` }}
+          >
+            <div className={`relative h-40 bg-gradient-to-br ${roomTone(project.type)} overflow-hidden`}>
+              <div className="absolute inset-0 opacity-25 bg-[radial-gradient(circle_at_30%_40%,rgba(255,255,255,0.25),transparent_55%)]" />
+              <div className="absolute inset-5 border border-white/15" />
+              <span className="absolute bottom-3 left-4 text-[10px] font-bold uppercase tracking-[0.14em] text-white/85">
+                {statusLabel(project.status)}
+              </span>
+            </div>
+            <div className="pt-3 flex items-start justify-between gap-3">
+              <div>
+                <h3 className="font-display text-xl text-ink group-hover:text-primary transition-colors">
+                  {project.name}
+                </h3>
+                <p className="text-xs text-ink-muted mt-0.5 capitalize">
+                  {project.client?.name || 'Rohan Mehta'} · {project.type.toLowerCase().replace('_', ' ')}
+                </p>
+                <p className="text-[11px] text-ink-muted/80 mt-1">{project.updatedAt}</p>
+              </div>
+              <span className="mt-1 text-primary opacity-0 group-hover:opacity-100 transition-opacity">
+                <ArrowRight className="w-4 h-4" />
+              </span>
+            </div>
+          </Link>
+        ))}
       </div>
+
+      {filtered.length === 0 && (
+        <p className="text-sm text-ink-muted py-8">No projects match that search.</p>
+      )}
     </div>
   );
 };
